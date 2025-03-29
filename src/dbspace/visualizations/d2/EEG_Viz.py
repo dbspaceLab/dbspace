@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan 27 11:23:06 2017
+
+@author: virati
+This library is a small quick library for 3d plotting of EEG
+"""
+
+import matplotlib.pyplot as plt
+import mne
+import numpy as np
+import scipy.stats as stats
+
+import time
+
+
+def return_adj_net(dist_thresh=3):
+    egipos = mne.channels.read_montage("/tmp/GSN-HydroCel-257.sfp")
+    etrodes = egipos.pos
+
+    dist = np.zeros((257, 257))
+    for ii, ipos in enumerate(etrodes):
+        # loop through all others and find the distances
+        for jj, jpos in enumerate(etrodes):
+            dist[ii][jj] = np.linalg.norm(ipos - jpos)
+
+    mask = (dist <= dist_thresh).astype(int)
+
+    return mask
+
+
+def get_coords(scale, montage="dense"):
+    if montage == "dense":
+        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+    elif montage == "standard":
+        fname = "/home/virati/Dropbox/standard_postfixed.elc"
+
+    egipos = mne.channels.read_montage(fname)
+    etrodes = scale * egipos.pos
+
+    etrodes[:, 2] = etrodes[:, 2]
+
+    return etrodes
+
+
+# This function is to plot vector data for each channel at the channel's coordinates
+def plot_3d_locs(
+    band,
+    ax,
+    n=1,
+    scale=1,
+    clims=(0, 0),
+    label="generic",
+    animate=False,
+    unwrap=False,
+    sparse_labels=True,
+    highlight=[],
+    montage="dense",
+):
+    # fig = plt.figure()
+
+    etrodes = get_coords(scale=scale)
+
+    # gotta normalize the color
+    # band = np.tanh(band / 10) #5dB seems to be reasonable
+
+    cm = plt.cm.get_cmap("jet")
+
+    if clims == (0, 0):
+        clims = (np.min(band), np.max(band))
+
+    linewidths = np.ones_like(etrodes[:, 0])
+    linewidths[highlight] = 5
+    sc = ax.scatter(
+        etrodes[:, 0],
+        etrodes[:, 1],
+        etrodes[:, 2],
+        color="#ffffff",
+        s=100,
+        linewidth=3,
+        alpha=0.1,
+        edgecolors="k",
+    )
+
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    # Get rid of the spines
+    ax.w_xaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+    # ax.xlim((-10,10))
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+    plt.title(label)
+
+    print("Animation: " + str(animate))
+    if animate:
+        for angl in range(0, 360, 10):
+            print("Animating frame " + str(angl))
+            ax.view_init(azim=angl)
+            strangl = "000" + str(angl)
+            plt.savefig("/tmp/" + label + "_" + strangl[-3:] + ".png")
+            time.sleep(0.3)
+
+
+# The goal of this is to plot the bands on the scalp
+def plot_3d_scalp(
+    band,
+    infig=[],
+    n=1,
+    clims=(0, 0),
+    scale=1,
+    label="generic",
+    animate=False,
+    unwrap=False,
+    sparse_labels=True,
+    highlight=[],
+    montage="dense",
+    alpha=1,
+    marker_scale=5,
+):
+    # fig = plt.figure()
+
+    if montage == "dense":
+        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+    elif montage == "standard":
+        fname = "/home/virati/Dropbox/standard_postfixed.elc"
+
+    egipos = mne.channels.read_custom_montage(fname).get_positions()["ch_pos"]
+    pos = np.array([egipos[channel] for channel in egipos.keys()])
+    etrodes = scale * pos
+
+    # gotta normalize the color
+    # band = np.tanh(band / 10) #5dB seems to be reasonable
+
+    cm = plt.cm.get_cmap("jet")
+
+    if clims == (0, 0):
+        clims = (np.min(band), np.max(band))
+
+    if unwrap:
+        flat_etrodes = np.copy(etrodes)
+        flat_etrodes[:, 2] = flat_etrodes[:, 2] - np.max(flat_etrodes[:, 2]) + 0.01
+
+        flat_etrodes[:, 0] = (
+            flat_etrodes[:, 0]
+            * -10
+            * (flat_etrodes[:, 2] + 3 * 1 / (flat_etrodes[:, 2] - 0.6) + 0.5)
+        )
+        flat_etrodes[:, 1] = (
+            flat_etrodes[:, 1]
+            * -10
+            * (flat_etrodes[:, 2] + 3 * 1 / (flat_etrodes[:, 2] - 0.6) + 0.5)
+        )
+
+        if infig == []:
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, n)
+        else:
+            ax = infig
+
+        linewidths = marker_scale * np.ones_like(flat_etrodes[:, 0])
+        linewidths[highlight] = 3
+        # below changes can be: linewidth to only do the highlights, or fixed at 2 or something
+        sc = plt.scatter(
+            flat_etrodes[:, 0],
+            flat_etrodes[:, 1],
+            c=band,
+            vmin=clims[0],
+            vmax=clims[1],
+            s=300,
+            cmap=cm,
+            alpha=alpha,
+            linewidth=linewidths,
+            marker="o",
+        )
+        # this adds x's over the highlights
+        # plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=None,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=1,linewidth=linewidths,marker='x')
+
+        # Which channels are above two stds?
+        zsc_band = stats.zscore(band)
+        top_etrodes = np.where(np.abs(zsc_band) > 1)[0]
+
+        if sparse_labels:
+            annotate_list = top_etrodes
+        else:
+            annotate_list = range(257)
+
+        for ii in annotate_list:
+            plt.annotate(
+                "E" + str(ii + 1), (flat_etrodes[ii, 0], flat_etrodes[ii, 1]), size=12
+            )
+
+        plt.axis("off")
+
+        plt.colorbar(sc)
+        plt.title(label)
+
+    else:
+        if infig == []:
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, n, projection="3d")
+        else:
+            ax = infig  # infig.add_subplot(1,1,n,projection='3d')
+
+        linewidths = np.ones_like(etrodes[:, 0])
+        linewidths[highlight] = 5
+        # REMOVED a 10* z component here, I think it was originally added to help visualization
+        sc = ax.scatter(
+            etrodes[:, 0],
+            etrodes[:, 1],
+            etrodes[:, 2],
+            c=band,
+            vmin=clims[0],
+            vmax=clims[1],
+            s=300,
+            cmap=cm,
+            linewidth=linewidths,
+            alpha=alpha,
+        )
+
+        plt.colorbar(sc)
+
+        ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        # Get rid of the spines
+        ax.w_xaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+        ax.w_yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+        ax.w_zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+        # ax.xlim((-10,10))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+
+        ims = []
+        plt.title(label)
+
+        print("Animation: " + str(animate))
+        if animate:
+            for angl in range(0, 360, 10):
+                print("Animating frame " + str(angl))
+                ax.view_init(azim=angl)
+                strangl = "000" + str(angl)
+                plt.savefig("/tmp/" + label + "_" + strangl[-3:] + ".png")
+                time.sleep(0.3)

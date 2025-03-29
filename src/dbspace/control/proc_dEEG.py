@@ -9,12 +9,10 @@ Main Class for Processed dEEG Data
 """
 
 import dbspace as dbo
-from dbspace import simple_pca
 
 from collections import defaultdict
 import mne
 from scipy.io import loadmat
-import ipdb
 import numpy as np
 
 import scipy.signal as sig
@@ -25,20 +23,10 @@ import matplotlib.patches as mpatches
 
 from sklearn.utils import resample
 
-plt.close("all")
-
 import random
-from dbspace.visualizations import EEG_Viz
-# import dbspace.visualizations.EEG_Viz.EEG_Viz.plot_3d_scalp as EEG_Viz.plot_3d_scalp
-
-# import EEG_Viz.EEG_Viz.plot_3d_scalp as EEG_Viz.plot_3d_scalp
-# from EEG_Viz import EEG_Viz.plot_3d_scalp
+from dbspace.visualizations.d2 import EEG_Viz
 
 import seaborn as sns
-
-sns.set_context("paper")
-sns.set(font_scale=4)
-sns.set_style("white")
 
 
 from dbspace import nestdict
@@ -51,63 +39,69 @@ from sklearn import svm
 import sklearn
 from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.model_selection import learning_curve, StratifiedKFold
-
-from sklearn.decomposition import FactorAnalysis, PCA
-
-# import tensortools as tt
-# from tensortools.operations import unfold as tt_unfold, khatri_rao
-import tensorly as tl
-from tensorly import unfold as tl_unfold
-from tensorly.decomposition import parafac, tucker
-
-# import some useful functions (they are available in utils.py)
-# from utils import *
-
 import pickle
 
 import sys
 
-sys.path.append("/home/virati/Dropbox/projects/libs/robust-pca/")
+sys.path.append("/home/virati/Dropbox/Projects/libs/robust-pca/")
 import r_pca
-import pdb
+
 # %%
+
+BASE_EEG_DIR = "/home/virati/Data/phd_vrt_2013/neural/dEEG/"
 
 TargetingEXP = defaultdict(dict)
 # TargetingEXP['conservative'] = {'905':0,'906':0,'907':0,'908':0}
 TargetingEXP["conservative"] = {
     "905": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_con.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_con.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_con.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_con.mat",
     },
     "906": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref_1.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS906_TO_offTAR_bcr_LP_HP_seg_bcr_ref.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref_1.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS906_TO_offTAR_bcr_LP_HP_seg_bcr_ref.mat",
     },
     "907": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS907_TO_onTAR_MU_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS907_TO_offTAR_MU_seg_mff_cln_ref.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS907_TO_onTAR_MU_seg_mff_cln_ref.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS907_TO_offTAR_MU_seg_mff_cln_ref.mat",
     },
     "908": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_bcr_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref_1.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_bcr_ref.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/conservative/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref_1.mat",
     },
 }
 TargetingEXP["liberal"] = {
     "905": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_lib.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_lib.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_lib.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_lib.mat",
     },
     "906": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS906_TO_offTAR_LP_seg_mff_cln_ref_1.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS906_TO_offTAR_LP_seg_mff_cln_ref_1.mat",
     },
     "907": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS907_TO_onTAR_MU_seg_mff_cln_2ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS907_TO_offTAR_MU_seg_mff_cln_2ref.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS907_TO_onTAR_MU_seg_mff_cln_2ref.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS907_TO_offTAR_MU_seg_mff_cln_2ref.mat",
     },
     "908": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref.mat",
+        "OnT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_ref.mat",
+        "OffT": BASE_EEG_DIR
+        + "Segmented/Targeting_B4/liberal/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref.mat",
     },
 }
 
@@ -118,7 +112,7 @@ class proc_dEEG:
     def __init__(
         self,
         pts,
-        procsteps="liberal",
+        procsteps="conservative",
         condits=["OnT", "OffT"],
         pretty_mode=False,
         polyfix=0,
@@ -138,7 +132,7 @@ class proc_dEEG:
         # Load in the data
         self.ts_data = self.load_data(pts)
 
-        self.eeg_locs = mne.channels.read_montage(
+        self.eeg_locs = mne.channels.read_custom_montage(
             "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
         )
 
@@ -199,7 +193,7 @@ class proc_dEEG:
 
         self.fs = temp_data["EEGSamplingRate"][0][0]
         self.donfft = 2**11
-        self.fvect = np.linspace(0, self.fs / 2, self.donfft / 2 + 1)
+        self.fvect = np.linspace(0, self.fs // 2, self.donfft // 2 + 1)
 
         return ts_data
 
