@@ -341,8 +341,8 @@ def maya_band_display(band, montage="dense", label=""):
     # Make a single sphere for the head
     pv.plot(np.array([0.0, 0.0, 0.0]), color=(0.5, 0.5, 0.5))
     # Setup electrodes as spheres around head
-    # pv.plot(etrodes[0:10])
-    pv.show()
+    pv.plot(etrodes[0:10])
+    # pv.show()
 
 
 def plot_maya_scalp(
