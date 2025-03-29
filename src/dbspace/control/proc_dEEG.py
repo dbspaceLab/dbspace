@@ -25,6 +25,7 @@ from sklearn.utils import resample
 
 import random
 from dbspace.visualizations.d2 import EEG_Viz
+from dbspace.visualizations.d3 import EEG_Viz as eeg3d
 
 import seaborn as sns
 
@@ -625,7 +626,7 @@ class proc_dEEG:
             ).squeeze()
             # The old scatterplot approach
             if use_maya:
-                EEG_Viz.maya_band_display(response_dict[:, band_i])
+                eeg3d.maya_band_display(response_dict[:, band_i])
             else:
                 EEG_Viz.plot_3d_scalp(
                     response_dict[:, band_i],
