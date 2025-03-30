@@ -328,20 +328,36 @@ def plot_tracts(band, active_mask=[], rad=[], color=[0.0, 0.0, 0.0], alpha=1):
     )
 
 
-def maya_band_display(band, montage="dense", label=""):
+def maya_band_display(band_power, montage="dense", label=""):
     if montage == "dense":
         fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
+    if band_power.shape[0] != 257:
+        raise ValueError(
+            "band_power must be of shape (257, n) where n is the number of time points"
+        )
+
+    cm = plt.cm.get_cmap("jet")
+    # Normalize band_power to be between 0 and 1
+    band_power = (band_power - np.min(band_power)) / (
+        np.max(band_power) - np.min(band_power)
+    )
+
     egipos = mne.channels.read_custom_montage(fname).get_positions()["ch_pos"]
-    pos = np.array([egipos[channel] for channel in egipos.keys()])
-    etrodes = pos
+    etrodes = np.array([egipos[channel] for channel in egipos.keys()])
 
     # Make a single sphere for the head
-    pv.plot(np.array([0.0, 0.0, 0.0]), color=(0.5, 0.5, 0.5))
+    p = pv.Plotter()
+    for ee, pos in enumerate(etrodes):
+        p.add_mesh(pv.Sphere(center=pos, radius=0.01), color=cm(band_power[ee]))
+
+    p.show()
+    # sphere = pv.Sphere(radius=15)
+    # sphere.plot()
     # Setup electrodes as spheres around head
-    pv.plot(etrodes[0:10])
+    # pv.plot(etrodes[0:10])
     # pv.show()
 
 
