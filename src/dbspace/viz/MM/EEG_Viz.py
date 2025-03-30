@@ -10,11 +10,10 @@ This library is a small quick library for 3d plotting of EEG
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
-
+import mne
+import pyvista as pv
 
 import time
-
-from mpl_toolkits.mplot3d import Axes3D
 
 from dbspace.utils.eeg_positions import get_eeg_positions
 
@@ -356,31 +355,32 @@ def plot_tracts(band, active_mask=[], rad=[], color=[0.0, 0.0, 0.0], alpha=1):
     )
 
 
-def maya_band_display(band, montage="dense", label=""):
+def maya_band_display(band_power, montage="dense", label=""):
     if montage == "dense":
         fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
-    mlab.figure(bgcolor=(1.0, 1.0, 1.0))
+    if band_power.shape[0] != 257:
+        raise ValueError(
+            "band_power must be of shape (257, n) where n is the number of time points"
+        )
 
-    etrodes = get_eeg_positions()
+    cm = plt.cm.get_cmap("jet")
+    # Normalize band_power to be between 0 and 1
+    band_power = (band_power - np.min(band_power)) / (
+        np.max(band_power) - np.min(band_power)
+    )
+
+    egipos = mne.channels.read_custom_montage(fname).get_positions()["ch_pos"]
+    etrodes = np.array([egipos[channel] for channel in egipos.keys()])
 
     # Make a single sphere for the head
-    head = points3d(0, 0, 0, scale_factor=15)
-    # Setup electrodes as spheres around head
-    nodes = points3d(etrodes[:, 0], etrodes[:, 1], etrodes[:, 2], scale_factor=2)
-    nodes.glyph.scale_mode = "scale_by_vector"
+    p = pv.Plotter()
+    for ee, pos in enumerate(etrodes):
+        p.add_mesh(pv.Sphere(center=pos, radius=0.01), color=cm(band_power[ee]))
 
-    # Have to bring band from (-1,1) to (0,1) for mayavi color bullshit
-    band_norm = band / np.max(band)
-    band_norm += 1 / 2
-    # band_norm = 0.5 * np.tanh(band * 5) + 0.5
-
-    # This sets the colors for the nodes themselves to the band  changes after normalization into [0,1]
-    nodes.mlab_source.dataset.point_data.scalars = band_norm
-    # show()
-    mlab.title(label)
+    p.show()
 
 
 def plot_maya_scalp(

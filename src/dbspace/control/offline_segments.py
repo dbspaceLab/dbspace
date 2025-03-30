@@ -39,7 +39,7 @@ from sklearn.utils import resample
 from statsmodels import robust
 import json
 import logging
-from dbspace.utils.r_pca.robust_pca import rpca as r_pca
+from dbspace.utils.r_pca.robust_pca import rpca_wrap
 
 import logging
 
@@ -717,8 +717,7 @@ class network_action_dEEG:
         # Focusing just on alpha
         # response_stack = np.dot(response_stack.T,response_stack)
 
-        # pdb.set_trace()
-        rpca = r_pca.R_pca(response_stack)
+        rpca = rpca_wrap(response_stack)
         L, S = rpca.fit()
 
         svm_pca = PCA()
@@ -760,7 +759,7 @@ class network_action_dEEG:
         svm_ica_coeffs = []
         for ii in range(seg_responses.shape[0]):
             # pdb.set_trace()
-            rpca = r_pca.R_pca(seg_responses[ii, :, :])
+            rpca = rpca_wrap(seg_responses[ii, :, :])
             L, S = rpca.fit()
 
             # L = seg_responses[ii,:,:]
@@ -795,7 +794,7 @@ class network_action_dEEG:
         rot_S = []
 
         # pdb.set_trace()
-        rpca = r_pca.R_pca(seg_responses[:, :].T)
+        rpca = rpca_wrap(seg_responses[:, :].T)
         L, S = rpca.fit()
 
         # L = seg_responses[ii,:,:]
@@ -920,7 +919,7 @@ class network_action_dEEG:
         rot_S = []
         for ii in range(seg_responses.shape[0]):
             # pdb.set_trace()
-            rpca = r_pca.R_pca(seg_responses[ii, :, :])
+            rpca = rpca_wrap(seg_responses[ii, :, :])
             L, S = rpca.fit()
 
             # L = seg_responses[ii,:,:]
@@ -1029,43 +1028,13 @@ class network_action_dEEG:
             response_dict = np.median(L, axis=0)[:, comp].squeeze()
             EEG_Viz.maya_band_display(response_dict)
 
-    # Dimensionality reduction of ONTarget response; for now rPCA
-    def topo_OnT_ctrl_tensor(self, **kwargs):
-        pt = kwargs["pt"]
-        seg_responses = self.osc_bl_norm[pt]["OnT"][:, :, 0:4]
-
-        # factors = parafac(seg_responses,rank=4)
-        print(seg_responses.shape)
-        # core, factors = tucker(seg_responses)
-        factors = parafac(
-            seg_responses.swapaxes(0, 1), rank=4
-        )  # factors gives us weight, factors
-        # plt.plot(core[0])
-        # print(len(factors))
-        print(factors)
-        for ii in range(4):
-            fig = plt.figure()
-            # EEG_Viz.plot_3d_scalp(seg_responses[20,:,2],fig,label='Raw Segment',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-            EEG_Viz.plot_3d_scalp(
-                factors[1][0][:, ii],
-                fig,
-                label="Tensor Decomp " + str(ii),
-                unwrap=True,
-                scale=100,
-                alpha=0.3,
-                marker_scale=5,
-            )
-        print(factors[0])
-        # print(core.shape)
-        # print((factors))
-
     def OnT_ctrl_modes(self, pt="POOL", data_source=[], do_plot=False, plot_maya=True):
         print("Using BL Norm Segments - RAW")
         med_response = np.median(self.osc_bl_norm[pt]["OnT"], axis=0).squeeze()
         source_label = "BL Normed Segments"
 
         svm_pca_coeffs = []
-        rpca = r_pca.R_pca(med_response)
+        rpca = rpca_wrap(med_response)
         L, S = rpca.fit()
 
         # L = med

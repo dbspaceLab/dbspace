@@ -1,6 +1,7 @@
 """
 Adapted from https://github.com/dganguli/robust-pca
 """
+
 from __future__ import division
 import numpy as np
 
@@ -10,7 +11,7 @@ except ImportError:
     print("Unable to import pylab. R_pca.plot_fit() will not work.")
 
 
-class rpca:
+class rpca_wrap:
     def __init__(self, D, mu=None, lmbda=None):
         self.D = D
         self.S = np.zeros(self.D.shape)
@@ -42,7 +43,7 @@ class rpca:
 
     def fit(self, tol=None, max_iter=1000, iter_print=100):
         iter = 0
-        err = np.Inf
+        err = np.inf
         Sk = self.S
         Yk = self.Y
         Lk = np.zeros(self.D.shape)
@@ -67,7 +68,6 @@ class rpca:
         return Lk, Sk
 
     def plot_fit(self, size=None, tol=0.1, axis_on=True):
-
         n, d = self.D.shape
 
         if size:
