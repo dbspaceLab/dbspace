@@ -2629,7 +2629,7 @@ class proc_dEEG:
             self.tot_var = np.abs(tot_var)
             plt.figure()
             self.import_mask = np.abs(tot_var) > 0.10
-            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int), unwrap=True)
+            EEG_Viz.plot_3d_scalp(self.import_mask.astype(int), unwrap=True)
             plt.suptitle("Looking at the coefficients mulitiplied by feature variances")
             # Let's take a look at each band's distribution
             plt.figure()
