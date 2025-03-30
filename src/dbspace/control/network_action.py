@@ -26,7 +26,6 @@ logging.basicConfig(
 logging.info("Starting the log...")
 
 
-
 class local_response:
     # Setup our main variables for the analysis
     TF_response = nestdict()
@@ -113,7 +112,7 @@ class local_response:
             for ss, side in enumerate(["Left", "Right"])
         }
 
-        #%%
+        # %%
         # here we'll work with the oscillatory state variables
         self.Osc_pt_marg = {
             condit: np.array(
@@ -216,8 +215,8 @@ class local_response:
                 # ontres = stats.ranksums(distr['OnT'][:,bb])
                 # ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
                 # ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
-                ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
-                print(condit + " " + str(ontres))
+                # ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
+                # print(condit + " " + str(ontres))
 
             plt.ylim((-30, 50))
             plt.legend()
@@ -274,8 +273,8 @@ class local_response:
                 except:
                     raise Exception("Problem with the KS 2 sample test...")
                 logging.info(rsres)
-                ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
-                logging.info(condit + " " + str(ontres))
+                # ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
+                # logging.info(condit + " " + str(ontres))
 
             plt.ylim((-30, 50))
             plt.legend()
@@ -333,7 +332,7 @@ class local_response:
                 # ontres = stats.ranksums(distr['OnT'][:,bb])
                 # ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
                 # ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
-                ontres = stats.ttest_1samp(distr["OnT"][:, bb], 0)
+                # ontres = stats.ttest_1samp(distr["OnT"][:, bb], 0)
                 print(DEFAULT_FEAT_ORDER[bb])
                 print(rsres)
-                print(ontres)
+                # print(ontres)

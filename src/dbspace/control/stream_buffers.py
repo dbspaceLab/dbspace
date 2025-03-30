@@ -6,6 +6,7 @@ Created on Sun Mar 25 17:41:48 2018
 @author: virati
 Streaming Class
 """
+
 import logging
 import pickle
 from collections import defaultdict
@@ -25,7 +26,7 @@ from dbspace.viz.MM import EEG_Viz
 from sklearn import mixture, svm
 from sklearn.decomposition import PCA
 from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
-
+from . import targeting_experiment as TA
 # plt.rcParams["image.cmap"] = "jet"
 
 logging.basicConfig(
@@ -54,16 +55,11 @@ class streamLFP:
         self.condit = condit
 
         if config_file is None:
-            raise ValueError("Need to input a streaming configuration file...")
+            self.targeting_config = TA.TARGETING_LFP
 
-        with open(config_file, "r") as config:
-            Targeting = json.load(config)
-        self.targeting_config = Targeting
-
-        try:
-            container = load_BR_dict(Targeting["All"][pt][condit]["lfp"], sec_offset=0)
-        except:
-            raise Exception("There's a problem loading the BR Dictionary")
+        container = load_BR_dict(
+            self.targeting_config["All"][pt][condit]["lfp"], sec_offset=0
+        )
 
         fs = 422
 
