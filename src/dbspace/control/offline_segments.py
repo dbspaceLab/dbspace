@@ -13,6 +13,7 @@ import sys
 from collections import defaultdict
 
 import dbspace as dbo
+import dbspace.control.targeting_experiment as TE
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import mne
@@ -38,10 +39,16 @@ from sklearn.utils import resample
 from statsmodels import robust
 import json
 import logging
-from dbspace.utils.r_pca.robust_pca import rpca
+from dbspace.utils.r_pca.robust_pca import rpca as r_pca
 
-#%%
-#%%
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+# %%
 
 
 class network_action_dEEG:
@@ -56,13 +63,14 @@ class network_action_dEEG:
         pretty_mode=False,
         polyfix=0,
     ):
-
         if config_file is None:
-            raise ValueError(
-                "No config file provided, please provide an experiment json..."
+            logging.warning(
+                "No config provided, will go with default Targeting/File Information"
             )
 
-        self.load_config(config_file)
+            self.targeting_config = {"lfp": TE.TARGETING_LFP, "eeg": TE.TARGETING_EEG}
+        else:
+            self.load_config(config_file)
 
         self.chann_dim = 257
         self.ch_order_list = range(self.chann_dim)
@@ -79,19 +87,21 @@ class network_action_dEEG:
         # Load in the data
         self.ts_data = self.load_data(pts)
 
-        self.eeg_locs = mne.channels.read_montage(
+        self.eeg_locs = mne.channels.read_custom_montage(
             "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
-        )
+        ).get_positions()["ch_pos"]
+
+        # recent change requires this to be done to get it into workable positions
+        # pos = np.array([egipos[channel] for channel in egipos.keys()])
+        # etrodes = scale * pos
 
         self.gen_output_variables()
 
     """Setup all the output variables we need"""
 
-    def load_config(self, config_file):
+    def load_config(self, config_file=None):
         with open(config_file, "r") as config:
-            Targeting = json.load(config)
-
-        self.targeting_config = Targeting
+            self.targeting_config = json.load(config)
 
     def gen_output_variables(self):
         # CHECK IF we're still using ANY of these
@@ -145,7 +155,9 @@ class network_action_dEEG:
             for condit in self.condits:
                 ts_data[pt][condit] = defaultdict(dict)
 
-                temp_data = loadmat(self.targeting_config[self.procsteps][pt][condit])
+                temp_data = loadmat(
+                    self.targeting_config["eeg"][self.procsteps][pt][condit]
+                )
 
                 for epoch in self.keys_of_interest[condit]:
                     ts_data[pt][condit][epoch] = temp_data[epoch]
@@ -203,9 +215,9 @@ class network_action_dEEG:
                             state_return = calc_feats(middle_osc[:, ss, :], self.fvect)[
                                 0
                             ].T
-                            state_return[
-                                :, 4
-                            ] = 0  # we know gamma is nothing for this entire analysis
+                            state_return[:, 4] = (
+                                0  # we know gamma is nothing for this entire analysis
+                            )
                             # pdb.set_trace()
                             OSC_matr[ss, :, :] = np.array(
                                 [state_return[ch] for ch in range(257)]
@@ -742,13 +754,11 @@ class network_action_dEEG:
         self.dyn_L = L
 
     def OnT_ctrl_modes_segs_ICA(self, pt="POOL", do_plot=False):
-
         seg_responses = self.osc_bl_norm[pt]["OnT"][:, :, 0:4]
         source_label = "Segment Responses"
 
         svm_ica_coeffs = []
         for ii in range(seg_responses.shape[0]):
-
             # pdb.set_trace()
             rpca = r_pca.R_pca(seg_responses[ii, :, :])
             L, S = rpca.fit()
@@ -909,7 +919,6 @@ class network_action_dEEG:
         rot_L = []
         rot_S = []
         for ii in range(seg_responses.shape[0]):
-
             # pdb.set_trace()
             rpca = r_pca.R_pca(seg_responses[ii, :, :])
             L, S = rpca.fit()
@@ -1051,7 +1060,6 @@ class network_action_dEEG:
         # print((factors))
 
     def OnT_ctrl_modes(self, pt="POOL", data_source=[], do_plot=False, plot_maya=True):
-
         print("Using BL Norm Segments - RAW")
         med_response = np.median(self.osc_bl_norm[pt]["OnT"], axis=0).squeeze()
         source_label = "BL Normed Segments"
@@ -1244,7 +1252,6 @@ class network_action_dEEG:
             for bb, band in enumerate(DEFAULT_FEAT_ORDER):
                 covar_matrix[condit][band] = []
                 for seg in range(seg_num):
-
                     net_vect = seg_stack[:, seg, bb].reshape(-1, 1)
 
                     cov_matr = np.dot(net_vect, net_vect.T)
@@ -1314,7 +1321,6 @@ class network_action_dEEG:
         plt.ylim((0, 1))
 
         for cc in range(2):
-
             # plot the boring views first
             plt.figure()
             plt.subplot(211)
@@ -1608,7 +1614,6 @@ class network_action_dEEG:
         plt.subplot(211)
         serr_med = {key: 0 for key in self.condits}
         for condit in self.condits:
-
             plt.plot(band_median[condit], label=condit)
             serr_med[condit] = 1.48 * band_mad[condit] / np.sqrt(band_segnum[condit])
 
@@ -2110,7 +2115,6 @@ class network_action_dEEG:
     """Analysis of the binary SVM coefficients should be here"""
 
     def analyse_binSVM(self, feature_weigh=False):
-
         # What exactly is this trying to do here??
         # plt.figure()
         # for ii in range(4):
@@ -2176,6 +2180,7 @@ class network_action_dEEG:
         }
 
     """ Below are functions related to the oscillatory response characterization"""
+
     # This goes to the psd change average and computed average PSD across all available patients
     def pop_response(self):
         psd_change_matrix = nestdict()
@@ -2204,7 +2209,6 @@ class network_action_dEEG:
         varOsc_mask = nestdict()
 
         for condit in self.condits:
-
             # First, let's average across patients
 
             # band = np.where(np.logical_and(self.fvect > 14, self.fvect < 30))
@@ -2311,7 +2315,6 @@ class network_action_dEEG:
                 if var_fixed:
                     plot_vect = self.reliablePSD[condit]["BandVect"]["Vect"]
                 else:
-
                     plot_vect = np.median(
                         self.avgPSD[condit]["PSD"][:, band_idxs].squeeze(), axis=1
                     )

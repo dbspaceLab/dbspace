@@ -27,12 +27,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-import mayavi.mlab as mlab
-from mayavi.mlab import *
 
-import pdb
-
-#%%
+# %%
 
 
 class head_model:
@@ -67,7 +63,7 @@ class head_model:
         combined = image.math_img("img1+img2", img1=data["L"], img2=data["R"])
         # plotting.plot_glass_brain(combined,black_bg=True,title=pt + ' ' + condit)
 
-        #%% DTI STUFF
+        # %% DTI STUFF
         # manual, numpy way
         voxels = np.array(combined.dataobj)
         vox_loc = np.array(np.where(voxels > 0)).T
@@ -80,7 +76,7 @@ class head_model:
 
         mni_vox = sig.detrend(np.array(mni_vox), axis=0, type="constant")
 
-        #%% CALCULATE TRACT->PARCEL
+        # %% CALCULATE TRACT->PARCEL
         # now that we're coregistered, we go to each parcellation and find the minimum distance from it to the tractography
 
         vox_loc = mni_vox / 3
@@ -106,7 +102,6 @@ class head_model:
         pass
 
     def viz_head(self):
-
         mlab.figure(bgcolor=(1.0, 1.0, 1.0))
         ## NEED TO PRETTY THIS UP with plot_3d_scalp updates that give much prettier OnT/OffT pictures
         # First, we plot the tracts from the DTI
@@ -143,7 +138,7 @@ class head_model:
         )
 
     def plot_mechanism(self):
-        #%% Here we plot for the primary and secondary channels
+        # %% Here we plot for the primary and secondary channels
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         EEG_Viz.plot_3d_scalp(second_chann_mask, ax, scale=10, alpha=0.2, unwrap=False)
@@ -183,7 +178,7 @@ class head_model:
 
         dist_to_closest_tract = np.array(dist_to_closest_tract)
 
-        #%% Threshold tract -> parcellations
+        # %% Threshold tract -> parcellations
         # This is our FIRST threshold
 
         # plt.hist(dist_to_closest_tract)
@@ -191,7 +186,7 @@ class head_model:
         plt.figure()
         plt.hist(dist_to_closest_tract)
         plt.title("Tract->Parcel histogram")
-        #%%
+        # %%
         # So, above, we've just found the prior parcellations that we expect changes in
         # No we're going to find the 2nd order nodes
         first_order = prior_locs.astype(np.float)
@@ -215,7 +210,7 @@ class head_model:
         # plt.figure();plt.hist(second_order)https://schmidtsciencefellows.org/
         # plt.title('Histogram of Second Order Laplacian Magnitudes')
         second_locs = second_order > 10
-        #%%
+        # %%
         #
         eeg_scale = 10
         EEG_coords = EEG_Viz.get_coords(scale=eeg_scale)
@@ -240,7 +235,7 @@ class head_model:
 
             dist_to_closest_second[cc] = np.min(np.array(parcel_dist))
 
-        #%%
+        # %%
 
         # This is our SECOND threshold
         prior_channs = np.array(dist_to_closest_parcel) < eeg_thresh
@@ -261,7 +256,7 @@ class head_model:
         ).astype(np.int)
 
         # pdb.set_trace()
-        #%%
+        # %%
         # Channel mask writing
 
         EEG_support = {
@@ -304,7 +299,7 @@ class head_model:
         )
 
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def DTI_support_model(
     pt,
     voltage,
@@ -355,7 +350,7 @@ def DTI_support_model(
     combined = image.math_img("img1+img2", img1=data["L"], img2=data["R"])
     # plotting.plot_glass_brain(combined,black_bg=True,title=pt + ' ' + condit)
 
-    #%%
+    # %%
     # Move now to the DTI stuff directly
     # manual, numpy way
     voxels = np.array(combined.dataobj)
@@ -372,7 +367,7 @@ def DTI_support_model(
         mni_vox * dti_scale_factor
     )  # This scale factor is for the tractography. We want to make sure the tracts, especially the dorsal aspect of the cingulum, makes sense wrt the location of the rest of it
     vox_loc[:, 0] = tract_horiz * vox_loc[:, 0]
-    #%%
+    # %%
     # now that we're coregistered, we go to each parcellation and find the minimum distance from it to the tractography
     display_vox_loc = vox_loc[np.random.randint(vox_loc.shape[0], size=(1000,)), :] / 3
     display_vox_loc += np.random.normal(0, 1, size=display_vox_loc.shape)
@@ -392,7 +387,7 @@ def DTI_support_model(
         + brain_offset * z_translate_parcel
     )  # DISPLAYED
 
-    #%%
+    # %%
     # scale both display vox and parcel coords in the vertical direction
     # display_vox_loc[:,2] = 1.4 * display_vox_loc[:,2]
     # parcel_coords[:,2] = 1.4 * parcel_coords[:,2]
@@ -400,12 +395,12 @@ def DTI_support_model(
     # display_vox_loc[:,1] = 1.4 * display_vox_loc[:,1]
     # parcel_coords[:,1] = 1.4 * parcel_coords[:,1]
 
-    #%%
+    # %%
     # EEG Scaling stuff
     EEG_coords = EEG_Viz.get_coords(scale=eeg_scale)
     # maybe scale things here..
 
-    #%%
+    # %%
 
     ## ALL TRANSFORMATIONS SHOULD BE ABOVE HERE
     dist_to_closest_tract = [None] * parcel_coords.shape[0]
@@ -422,7 +417,7 @@ def DTI_support_model(
     dist_to_closest_tract = np.array(dist_to_closest_tract)
     primary_locs = dist_to_closest_tract < dti_parcel_thresh
 
-    #%%
+    # %%
     # VISUALIZATION SANITY CHECK PASSES!!!! SO WTF STUPID SHIT IS HAPPENING TO SCREW UP PRIMARY LOCS?
     if 0:
         EEG_Viz.plot_coords(
@@ -446,7 +441,7 @@ def DTI_support_model(
             plot_overlay=False,
             alpha=0.8,
         )
-    #%%
+    # %%
 
     # So, above, we've just found the prior parcellations that we expect changes in
     f_laplacian = np.load("/home/virati/Dropbox/TVB_192_conn.npy")
@@ -460,7 +455,7 @@ def DTI_support_model(
     # prune out 'primary' locs from the second_locs
     # second_locs = np.logical_and(second_locs==True,primary_locs==False) #THIS IS WHERE WE CAN DO MORE ADVANCED MODELING, like checking to see if a 'primary' effect would be larger than a very convergent 'secondary' effect from multiply primary upstream regions; in which case you prioritize the brain region as a 'secondary' node and not a 'primary' node
 
-    #%%
+    # %%
     # alt thresholding
     second_locs = np.logical_and(second_order > first_order, second_order > 20)
     second_normed = second_order / np.max(np.abs(second_order))
@@ -471,7 +466,7 @@ def DTI_support_model(
     primary_locs = np.logical_and(
         primary_locs, second_normed < 0.2
     )  # this worked for 906
-    #%%
+    # %%
     # Find First order EEG channels
     prim_EEG_to_parcel = [None] * EEG_coords.shape[0]
     for cc in range(EEG_coords.shape[0]):
@@ -490,7 +485,7 @@ def DTI_support_model(
 
         sec_EEG_to_parcel[cc] = np.min(np.array(parcel_dist))
 
-    #%%
+    # %%
 
     # This is our SECOND threshold
     primary_channs = np.array(prim_EEG_to_parcel) < eeg_thresh
@@ -511,7 +506,7 @@ def DTI_support_model(
     ).astype(np.int)
 
     # pdb.set_trace()
-    #%%
+    # %%
     # Channel mask writing
     EEG_support = {
         "primary": primary_chann_mask,
@@ -529,24 +524,23 @@ def DTI_support_model(
     # pickle.dump(EEG_support,open('/tmp/' + pt + '_' + condit + '_' + voltage,'wb'))
     return EEG_support
 
-    #%%
+    # %%
     # Do Mayavi Plotting
     # EEG_Viz.plot_maya_scalp(chann_mask,scale=10,alpha=0.5,unwrap=False)
     # EEG_Viz.plot_maya_scalp(np.ones((257,)),ax,scale=eeg_scale,animate=False)
     # EEG_Viz.plot_maya_scalp(chann_mask,ax,scale=10,alpha=0.5,unwrap=False)
 
 
-#%%
+# %%
 # The main support model code
 def plot_EEG_masks(EEG_support):
-
     primary_chann_mask = EEG_support["primary"]
     second_chann_mask = EEG_support["secondary"]
-    #%%
+    # %%
     # We clugy ourselves an EEG display for the primary and secondary channels
     EEG_Viz.maya_band_display(1 * primary_chann_mask - second_chann_mask)
 
-    #%EEG_Viz.maya_band_display(-1*second_chann_mask)
+    # %EEG_Viz.maya_band_display(-1*second_chann_mask)
 
 
 def plot_support_model(
@@ -569,7 +563,7 @@ def plot_support_model(
     # dti_scale_factor = EEG_support['dti_scale_factor']
     # tract_offset = EEG_support['tract_offset']
     display_vox_loc = EEG_support["display_vox_loc"]
-    #%%
+    # %%
     # Load in the coordinates for the parcellation
     parcel_coords = EEG_support["parcel_coords"]
     primary_locs = EEG_support["primary_locs"]
@@ -581,7 +575,7 @@ def plot_support_model(
     second_chann_mask = EEG_support["secondary"]
     # EEG_Viz.plot_3d_scalp(chann_mask,ax,scale=eeg_scale,alpha=0.5,unwrap=False)
 
-    #%% FINAL PLOTTING
+    # %% FINAL PLOTTING
     # This figure is for the
     mlab.figure(bgcolor=(1.0, 1.0, 1.0))
     ## NEED TO PRETTY THIS UP with plot_3d_scalp updates that give much prettier OnT/OffT pictures
