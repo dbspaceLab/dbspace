@@ -203,8 +203,8 @@ class local_response:
                 # ontres = stats.ranksums(distr['OnT'][:,bb])
                 # ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
                 # ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
-                ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
-                print(condit + " " + str(ontres))
+                # ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
+                # print(condit + " " + str(ontres))
 
             plt.ylim((-30, 50))
             plt.legend()
@@ -267,8 +267,8 @@ class local_response:
                 # ontres = stats.ranksums(distr['OnT'][:,bb])
                 # ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
                 # ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
-                ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
-                print(condit + " " + str(ontres))
+                # ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
+                # print(condit + " " + str(ontres))
 
             plt.ylim((-30, 50))
             plt.legend()
