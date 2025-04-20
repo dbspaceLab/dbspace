@@ -354,11 +354,6 @@ def maya_band_display(band_power, montage="dense", label=""):
         p.add_mesh(pv.Sphere(center=pos, radius=0.01), color=cm(band_power[ee]))
 
     p.show()
-    # sphere = pv.Sphere(radius=15)
-    # sphere.plot()
-    # Setup electrodes as spheres around head
-    # pv.plot(etrodes[0:10])
-    # pv.show()
 
 
 def plot_maya_scalp(

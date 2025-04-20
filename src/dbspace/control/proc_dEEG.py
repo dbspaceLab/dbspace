@@ -467,90 +467,6 @@ class proc_dEEG:
             for condit in self.condits
         }
 
-    # In this function, we stack ONT_Off3 and OFFT_Off3 together to DEFINE the null distribution
-    def OBScombined_bl(self):
-        self.combined_BL = nestdict()
-        for pt in self.do_pts:
-            ONT_BL = self.osc_dict[pt]["OnT"][keys_oi["OnT"][0]]
-            OFFT_BL = self.osc_dict[pt]["OffT"][keys_oi["OffT"][0]]
-
-            if pt != "905":
-                self.combined_BL[pt] = np.concatenate((ONT_BL, OFFT_BL), axis=0)
-            else:
-                self.combined_BL[pt] = ONT_BL
-
-    def OBScombined_bl_distr(self, band="Alpha"):
-        band_idx = dbo.feat_order.index(band)
-
-        for pt in self.do_pts:
-            plt.figure()
-            for ch in range(256):
-                plt.violinplot(self.combined_BL[pt][:, ch, band_idx])
-
-    # Compare ONTarget and OFFTarget distributions
-    def OBSONTvsOFFT(self, band="Alpha", stim=0):
-        band_idx = dbo.feat_order.index(band)
-
-        for pt in self.do_pts:
-            ch_stat = np.zeros((257,))
-            ch_ont = []
-            ch_offt = []
-            for ch in range(256):
-                # distribution for pre-stimulation period
-                # pdb.set_trace()
-                ONT_distr = []
-                OFFT_distr = []
-                for ii in range(10):
-                    ont_rand_idx = random.sample(
-                        range(
-                            0, self.osc_dict[pt]["OnT"][keys_oi["OnT"][stim]].shape[0]
-                        ),
-                        10,
-                    )
-                    offt_rand_idx = random.sample(
-                        range(
-                            0, self.osc_dict[pt]["OffT"][keys_oi["OffT"][stim]].shape[0]
-                        ),
-                        10,
-                    )
-
-                    ONT_distr.append(
-                        np.mean(
-                            self.osc_dict[pt]["OnT"][keys_oi["OnT"][stim]][
-                                ont_rand_idx, ch, band_idx
-                            ]
-                        )
-                    )
-                    OFFT_distr.append(
-                        np.mean(
-                            self.osc_dict[pt]["OffT"][keys_oi["OffT"][stim]][
-                                offt_rand_idx, ch, band_idx
-                            ]
-                        )
-                    )
-
-                # baseline_distr = self.osc_dict[pt][condit][keys_oi[condit][0]][0:20,ch,band_idx]#should be segments x bands
-                # stim_distr = self.osc_dict[pt][condit][keys_oi[condit][1]][0:20,ch,band_idx]
-                diff_stat = stats.ranksums(ONT_distr, OFFT_distr)
-                # diff_stat = stats.f_oneway(baseline_distr,stim_distr)
-                print(str(ch) + ":" + str(diff_stat))
-                ch_stat[ch] = diff_stat[1]
-
-                ch_ont.append(np.mean(ONT_distr))
-                ch_offt.append(np.mean(OFFT_distr))
-
-            plt.figure()
-            plt.violinplot(ch_ont)
-            plt.violinplot(ch_offt)
-            plt.ylim((-10, 10))
-            plt.suptitle(pt + " stim: " + str(stim))
-
-            plt.figure()
-            plt.plot(ch_stat)
-            plt.axhline(0.05 / 256, 0, 256)
-
-            plt.suptitle(pt + " stim: " + str(stim))
-
     # Do per-channel, standard stats. Compare pre-stim to stim condition
     def per_chann_stats(self, condit="OnT", band="Alpha"):
         band_idx = dbo.feat_order.index(band)
@@ -639,122 +555,6 @@ class proc_dEEG:
                     marker_scale=5,
                 )
                 plt.suptitle(pt)
-
-    def OBSOBSsupport_analysis(
-        self, pt="POOL", condit="OnT", voltage="3", band="Alpha"
-    ):
-        support_struct = pickle.load(
-            open("/tmp/" + pt + "_" + condit + "_" + voltage, "rb")
-        )
-        distr = self.distr_response(pt=pt)
-        # medians = np.median(self.targ_response[pt][condit],axis=0)
-        fig = plt.figure()
-        # First, we'll plot what the medians actually are
-        band_i = dbo.feat_order.index(band)
-        EEG_Viz.plot_3d_scalp(
-            np.median(distr["OnT"][:, :, band_i], axis=0),
-            fig,
-            label="OnT Mean Response " + band,
-            unwrap=True,
-            scale=10,
-        )
-        plt.suptitle(pt)
-
-        band_i = dbo.feat_order.index(band)
-
-        full_distr = distr[
-            "OnT"
-        ][
-            :, :, band_i
-        ]  # - np.mean(medians['OnT'][:,band_i]) #this zeros the means of the distribution
-
-        primary_distr = full_distr[:, support_struct["primary"] == 1]
-        secondary_distr = full_distr[:, support_struct["secondary"] == 1]
-
-        for cc in range(257):
-            p_val[cc] = stats.ks_2samp(primary_distr[:, cc], secondary_distr[:, cc])
-
-    """
-    Support analysis involves looking at forward-modeled EEG changes for Primary and Secondary nodes built from tractography
-    
-    """
-
-    def support_analysis(
-        self, support_struct, pt="POOL", condit="OnT", voltage="3", band="Alpha"
-    ):
-        # support_struct = pickle.load(open('/tmp/'+ pt + '_' + condit + '_' + voltage,'rb'))
-        if band == "rP0":
-            medians = self.dyn_L.swapaxes(
-                0, 1
-            )  # if we want to use the 0th component of the dyn_rPCA eigenvector
-            band_i = 0
-        else:
-            medians = self.OBSmedian_response(pt=pt)[
-                "OnT"
-            ]  # if we want to use the standard median Alpha change
-            band_i = dbo.feat_order.index(band)
-
-        # medians = np.median(self.targ_response[pt][condit],axis=0)
-        fig = plt.figure()
-        # First, we'll plot what the medians actually are
-
-        EEG_Viz.plot_3d_scalp(
-            medians[:, band_i],
-            fig,
-            label="OnT Mean Response " + band,
-            unwrap=True,
-            scale=10,
-        )
-        plt.suptitle(pt)
-
-        full_distr = medians[
-            :, band_i
-        ]  # - np.mean(medians[:,band_i]) #this zeros the means of the distribution
-
-        primary_distr = full_distr[support_struct["primary"] == 1]
-        # now we'll circle where the primary nodes are
-
-        print(np.sum((support_struct["primary"] == 1).astype(np.int)))
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        EEG_Viz.plot_3d_scalp(
-            support_struct["primary"], ax, scale=10, alpha=0.5, unwrap=True
-        )
-        plt.title("Primary Channels")
-
-        secondary_distr = full_distr[support_struct["secondary"] == 1]
-        print(np.sum((support_struct["secondary"] == 1).astype(np.int)))
-        fig = plt.figure()
-        EEG_Viz.plot_3d_scalp(
-            support_struct["secondary"], fig, scale=10, alpha=0.5, unwrap=True
-        )
-        plt.title("Secondary Channels")
-
-        labels = []
-
-        def add_label(violin, label):
-            color = violin["bodies"][0].get_facecolor().flatten()
-            labels.append((mpatches.Patch(color=color), label))
-
-        plt.figure()
-        bins = np.linspace(-2, 2, 20)
-        # plt.hist(primary_distr,bins=bins,alpha=0.5,label='Primary')
-        print("Primary mean: " + str(np.median(primary_distr)))
-        add_label(plt.violinplot(primary_distr), "Primary Nodes")
-        # pdb.set_trace()
-
-        # plt.hist(secondary_distr,bins=bins,alpha=0.5,label='Secondary')
-        print("Secondary mean: " + str(np.median(secondary_distr)))
-        add_label(plt.violinplot(secondary_distr), "Secondary Nodes")
-        plt.legend(*zip(*labels), loc=2)
-
-        print(stats.ks_2samp(primary_distr, secondary_distr))
-
-        # plt.hist(full_distr,bins=bins,alpha=0.5,label='FULL')
-        # plt.legend(['Primary','','','Secondary'])
-        plt.title(pt + " " + condit + " " + band)
-
-    """I guess this is about developing a rPCA approach to *dynamic* response without oscillations?"""
 
     def OnT_ctrl_dyn(self, pt="POOL", condit="OnT", do_plot=False):
         source_label = "Dyn PCA"
@@ -2492,7 +2292,7 @@ class proc_dEEG:
 
     """ Train our Binary SVM """
 
-    def train_binSVM(self, mask=False):
+    def train_binary_svm(self, mask=False):
         self.bin_classif = nestdict()
 
         dsgn_X, SVM_labels, num_segs = self.stack_dsgn()
@@ -2551,13 +2351,16 @@ class proc_dEEG:
             fpr, tpr, _ = roc_curve(Yva_ss, predicted_Y)
             rocs_auc.append(auc(fpr, tpr))
 
-        plt.figure()
+        plt.figure(figsize=(10, 20))
         plt.subplot(311)
         plt.hist(validation_accuracy)
+        plt.title("Validation Accuracy")
         plt.subplot(312)
         plt.plot(fpr, tpr)
+        plt.title("TPR vs FPR")
         plt.subplot(313)
         plt.hist(rocs_auc)
+        plt.title("ROC AUC")
 
     def oneshot_binSVM(self):
         best_model = self.bin_classif
@@ -2622,15 +2425,19 @@ class proc_dEEG:
             plt.figure()
             plt.subplot(2, 1, 1)
             plt.plot(np.abs(tot_var))
+            plt.title("Total Variance")
             plt.subplot(2, 1, 2)
             # EEG_Viz.plot_3d_scalp(np.abs(tot_var))
             plt.hist(np.abs(tot_var))
-
+            plt.title("Total Variance Histogram")
             self.tot_var = np.abs(tot_var)
+
             plt.figure()
             self.import_mask = np.abs(tot_var) > 0.10
-            EEG_Viz.plot_3d_scalp(self.import_mask.astype(int), unwrap=True)
-            plt.suptitle("Looking at the coefficients mulitiplied by feature variances")
+            EEG_Viz.plot_3d_scalp(
+                self.import_mask.astype(int), unwrap=True, label="Importance Mask"
+            )
+
             # Let's take a look at each band's distribution
             plt.figure()
 
@@ -2656,11 +2463,11 @@ class proc_dEEG:
             coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
 
             plt.figure()
-            plt.hist(coeffs, bins=50, range=(0, 1))
-            # plt.figure()
             self.import_mask = coeffs > 0
-            EEG_Viz.plot_3d_scalp(coeffs, unwrap=True)
-            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int), unwrap=True)
+            EEG_Viz.plot_3d_scalp(coeffs, unwrap=True, label="Coefficients")
+            EEG_Viz.plot_3d_scalp(
+                self.import_mask.astype(int), unwrap=True, label="Importance Mask"
+            )
             plt.suptitle("Just looking at the coefficients")
 
     # THE BELOW FUNCTION DOES NOT RUN, JUST HERE FOR REFERENCE AS THE SVM IS BEING RECODED ABOVE
@@ -3314,27 +3121,3 @@ class proc_dEEG:
 
     def coher_stat(self, pt_list=[], chann_list=[]):
         return self.extract_coher_feats(do_pts=pt_list, do_condits=["OnT", "OffT"])
-
-    """ GRAVEYARD """
-
-    def OBSBLWEIRDcompute_response(self, combine_baselines=True, plot=False):
-        if combine_baselines:
-            baseline = {
-                pt: np.median(self.combined_BL[pt], axis=0) for pt in self.do_pts
-            }
-        else:
-            baseline = {
-                pt: np.median(self.osc_dict[pt][condit][keys_oi[condit][0]], axis=0)
-                for pt in self.do_pts
-            }
-
-        self.osc_bl_norm = {
-            pt: {
-                condit: (self.osc_dict[pt][condit][keys_oi[condit][1]] - baseline[pt])
-                for condit in self.condits
-            }
-            for pt in self.do_pts
-        }
-
-        if plot:
-            plt.figure()
