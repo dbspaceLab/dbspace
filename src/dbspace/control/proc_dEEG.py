@@ -2435,7 +2435,10 @@ class proc_dEEG:
             plt.figure()
             self.import_mask = np.abs(tot_var) > 0.10
             EEG_Viz.plot_3d_scalp(
-                self.import_mask.astype(int), unwrap=True, label="Importance Mask"
+                self.import_mask.astype(int),
+                unwrap=True,
+                label="Importance Mask",
+                scale=100,
             )
 
             # Let's take a look at each band's distribution
@@ -2464,9 +2467,23 @@ class proc_dEEG:
 
             plt.figure()
             self.import_mask = coeffs > 0
-            EEG_Viz.plot_3d_scalp(coeffs, unwrap=True, label="Coefficients")
             EEG_Viz.plot_3d_scalp(
-                self.import_mask.astype(int), unwrap=True, label="Importance Mask"
+                coeffs,
+                unwrap=True,
+                label="Coefficients",
+                scale=100,
+                clims=(-1, 1),
+                alpha=0.3,
+                marker_scale=5,
+            )
+            EEG_Viz.plot_3d_scalp(
+                self.import_mask.astype(int),
+                unwrap=True,
+                label="Importance Mask",
+                scale=100,
+                clims=(-1, 1),
+                alpha=0.3,
+                marker_scale=5,
             )
             plt.suptitle("Just looking at the coefficients")
 
