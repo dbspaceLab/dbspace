@@ -42,10 +42,7 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.model_selection import learning_curve, StratifiedKFold
 import pickle
 
-import sys
-
-sys.path.append("/home/virati/Dropbox/Projects/libs/robust-pca/")
-import r_pca
+from dbspace.tools.r_pca import R_pca
 
 # %%
 
@@ -564,7 +561,7 @@ class proc_dEEG:
         # response_stack = np.dot(response_stack.T,response_stack)
 
         # pdb.set_trace()
-        rpca = r_pca.R_pca(response_stack)
+        rpca = R_pca(response_stack)
         L, S = rpca.fit()
 
         svm_pca = PCA()
@@ -606,7 +603,7 @@ class proc_dEEG:
         svm_ica_coeffs = []
         for ii in range(seg_responses.shape[0]):
             # pdb.set_trace()
-            rpca = r_pca.R_pca(seg_responses[ii, :, :])
+            rpca = R_pca(seg_responses[ii, :, :])
             L, S = rpca.fit()
 
             # L = seg_responses[ii,:,:]
@@ -641,7 +638,7 @@ class proc_dEEG:
         rot_S = []
 
         # pdb.set_trace()
-        rpca = r_pca.R_pca(seg_responses[:, :].T)
+        rpca = R_pca(seg_responses[:, :].T)
         L, S = rpca.fit()
 
         # L = seg_responses[ii,:,:]
@@ -766,7 +763,7 @@ class proc_dEEG:
         rot_S = []
         for ii in range(seg_responses.shape[0]):
             # pdb.set_trace()
-            rpca = r_pca.R_pca(seg_responses[ii, :, :])
+            rpca = R_pca(seg_responses[ii, :, :])
             L, S = rpca.fit()
 
             # L = seg_responses[ii,:,:]
@@ -911,7 +908,7 @@ class proc_dEEG:
         source_label = "BL Normed Segments"
 
         svm_pca_coeffs = []
-        rpca = r_pca.R_pca(med_response)
+        rpca = R_pca(med_response)
         L, S = rpca.fit()
 
         # L = med
@@ -935,7 +932,12 @@ class proc_dEEG:
         }
         return mode_model
 
-    def topo_OnT_ctrl(self, **kwargs):
+    def topo_OnT_actionmode(self, **kwargs):
+        if "number_of_modes" not in kwargs.keys():
+            num_modes = 2
+        else:
+            num_modes = kwargs["number_of_modes"]
+
         model = self.OnT_ctrl_modes(**kwargs)
 
         L = model["RotatedL"]
@@ -945,7 +947,8 @@ class proc_dEEG:
 
         # ALL PLOTTING BELOW
         # Plot the topo for our low-rank component
-        for comp in range(2):
+
+        for comp in range(num_modes):
             fig = plt.figure()
             EEG_Viz.plot_3d_scalp(
                 L[:, comp],
@@ -961,15 +964,16 @@ class proc_dEEG:
 
         # Plot our Components
         plt.figure()
-        plt.subplot(221)
+        # plt.subplot(221)
         plt.plot(expl_var)
         plt.ylim((0, 1))
-        plt.subplot(222)
+        plt.figure()
+        # plt.subplot(222)
         for cc in range(4):  # this loops through our COMPONENTS to find the end
             plt.plot(coeffs[cc, :], linewidth=5 - cc, alpha=0.2)  # ,alpha=expl_var[ii])
         plt.ylim((-1, 1))
-        plt.hlines(0, 0, 3)
-        plt.legend(["PC0", "PC1", "PC2", "PC3", "PC4"])
+        plt.legend(["PC0", "PC1", "PC2", "PC3"])
+        plt.hlines(0, 0, 4)
         plt.title("Low-Rank Components")
 
         plot_sparse = False
@@ -1006,7 +1010,7 @@ class proc_dEEG:
         if kwargs["plot_maya"]:
             # response_dict = np.median(L,axis=0)#[:,comp].squeeze()
             response = L[:, 1].squeeze()
-            EEG_Viz.maya_band_display(response)
+            eeg3d.maya_band_display(response)
             # EEG_Viz.plot_3d_scalp(response)
 
     def dict_all_obs(self, condits=["OnT"]):
@@ -1390,7 +1394,7 @@ class proc_dEEG:
             self.PCA_x = PCA_X
         elif pca_type == "rpca":
             # if we want to do rPCA here
-            rpca = r_pca.R_pca(PCAdsgn)
+            rpca = R_pca(PCAdsgn)
             L, S = rpca.fit()
 
             if plot_distr:
