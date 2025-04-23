@@ -463,7 +463,14 @@ feat_order = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor
 
 
 # Function to go through and find all the features from the PSD structure of dbo
-def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
+def calc_feats(
+    psdIn,
+    yvect,
+    dofeats="",
+    modality="eeg",
+    compute_method="median",
+    blank_out_gamma=False,
+):
     # psdIn is a VECTOR, yvect is the basis vector
     if dofeats == "":
         dofeats = feat_order
@@ -491,6 +498,14 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
         # feat_dict[feat] = dofunc['fn'](datacontainer,yvect,dofunc['param'])[0]
 
     feat_vect = np.array(feat_vect).squeeze()
+
+    if blank_out_gamma:
+        # This is a hack to blank out the gamma band
+        # feat_vect[feat_order.index('Gamma1')] = np.zeros_like(feat_vect[feat_order.index('Gamma1')])
+        # feat_vect[feat_order.index('Gamma2')] = np.zeros_like(feat_vect[feat_order.index('Gamma2')])
+        feat_vect[feat_order.index("Gamma1")] = np.zeros_like(
+            feat_vect[feat_order.index("Gamma1")]
+        )
 
     return feat_vect, dofeats
 

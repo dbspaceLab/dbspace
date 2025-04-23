@@ -166,9 +166,9 @@ class proc_dEEG:
 
     """Run the standard pipeline to prepare segments"""
 
-    def standard_pipeline(self):
+    def standard_pipeline(self, blank_out_gamma=True):
         print("Doing standard init pipeline")
-        self.extract_feats(polyorder=self.polyorder)
+        self.extract_feats(polyorder=self.polyorder, blank_out_gamma=blank_out_gamma)
         self.pool_patients()  # pool all the DBS RESPONSE vectors
         # self.median_responses = self.median_response(pt=self.do_pts)
         self.median_responses = self.median_bootstrap_response(
@@ -197,17 +197,14 @@ class proc_dEEG:
 
     """Extract features from the EEG datasegments"""
 
-    def extract_feats(self, polyorder=4):
+    def extract_feats(self, polyorder=4, blank_out_gamma=True):
         pts = self.do_pts
 
         psd_dict = nestdict()
         osc_dict = nestdict()
 
         for pt in pts:
-            # feat_dict[pt] = defaultdict(dict)
-
             for condit in self.condits:
-                # feat_dict[pt][condit] = defaultdict(dict)
                 for epoch in keys_oi[condit]:
                     # find the mean for all segments
                     data_matr = self.ts_data[pt][condit][
@@ -229,26 +226,23 @@ class proc_dEEG:
                     OSC_matr = np.zeros(
                         (seg_psds[0].shape[0], 257, len(dbo.feat_order))
                     )
-                    # middle_osc = {chann:seg_psd for chann,seg_psd in seg_psds.items}
                     middle_osc = np.array([seg_psds[ch] for ch in range(257)])
 
                     # have to go to each segment due to code
                     for ss in range(seg_psds[0].shape[0]):
-                        try:
-                            state_return = dbo.calc_feats(
-                                middle_osc[:, ss, :], self.fvect
-                            )[0].T
-                            state_return[:, 4] = (
-                                0  # we know gamma is nothing for this entire analysis
-                            )
-                            # pdb.set_trace()
-                            OSC_matr[ss, :, :] = np.array(
-                                [state_return[ch] for ch in range(257)]
-                            )
-                        except Exception as e:
-                            print("CRAP")
-                            print(e)
-                            ipdb.set_trace()
+                        state_return, state_feats = dbo.calc_feats(
+                            middle_osc[:, ss, :],
+                            self.fvect,
+                            blank_out_gamma=blank_out_gamma,
+                        )
+                        state_return = state_return.T
+                        # state_return[:, 4] = (
+                        #    0  # we know gamma is nothing for this entire analysis
+                        # )
+
+                        OSC_matr[ss, :, :] = np.array(
+                            [state_return[ch] for ch in range(257)]
+                        )
 
                     # find the variance for all segments
                     psd_dict[pt][condit][epoch] = PSD_matr
@@ -286,10 +280,6 @@ class proc_dEEG:
                 )
 
         self.targ_response = response
-
-    def DEPRtrain_SVM(self, mask=False):
-        # Bring in and flatten our stack
-        SVM_stack = 1
 
     def response_stats(self, band="Alpha", plot=False):
         band_idx = dbo.feat_order.index(band)
@@ -1755,7 +1745,7 @@ class proc_dEEG:
             print(rsres)
 
         # plt.suptitle(condit)
-        plt.ylim((-50, 50))
+        plt.ylim((-0.2, 10))
         plt.hlines(0, -1, 4, linestyle="dotted")
         plt.legend(["OnTarget", "OffTarget"])
 
@@ -2408,24 +2398,25 @@ class proc_dEEG:
 
     """Analysis of the binary SVM coefficients should be here"""
 
-    def analyse_binSVM(self, use_all_CVs=False):
-        if use_all_CVs:
-            coeffs = self.SVM_coeffs  # if we want it for all the folds
+    def analyse_binSVM_CV(self, plotting=True):
+        coeffs = self.SVM_coeffs  # if we want it for all the folds
 
-            # Below is if we want to weight by the feature amplitudes themselves; important since the Gamma coefficients are non-zero (with L2 regularization at least)
+        # Below is if we want to weight by the feature amplitudes themselves; important since the Gamma coefficients are non-zero (with L2 regularization at least)
 
-            # get the median power in each of the bands so we can get a weighed idea of which channels are most important
-            var_pow = np.var(self.SVM_raw_stack, axis=0).reshape(-1, order="C")
-            tot_var_bands = np.multiply(
+        # get the median power in each of the bands so we can get a weighed idea of which channels are most important
+        var_pow = np.var(self.SVM_raw_stack, axis=0).reshape(-1, order="C")
+        tot_var_bands = np.multiply(
+            np.median(coeffs, axis=0).reshape(-1, order="C"), var_pow
+        ).reshape(257, 5, order="C")
+        tot_var = np.sum(
+            np.multiply(
                 np.median(coeffs, axis=0).reshape(-1, order="C"), var_pow
-            ).reshape(257, 5, order="C")
-            tot_var = np.sum(
-                np.multiply(
-                    np.median(coeffs, axis=0).reshape(-1, order="C"), var_pow
-                ).reshape(257, 5, order="C"),
-                axis=1,
-            )
+            ).reshape(257, 5, order="C"),
+            axis=1,
+        )
+        self.tot_var = np.abs(tot_var)
 
+        if plotting:
             plt.figure()
             plt.subplot(2, 1, 1)
             plt.plot(np.abs(tot_var))
@@ -2434,7 +2425,6 @@ class proc_dEEG:
             # EEG_Viz.plot_3d_scalp(np.abs(tot_var))
             plt.hist(np.abs(tot_var))
             plt.title("Total Variance Histogram")
-            self.tot_var = np.abs(tot_var)
 
             plt.figure()
             self.import_mask = np.abs(tot_var) > 0.10
@@ -2447,30 +2437,27 @@ class proc_dEEG:
 
             # Let's take a look at each band's distribution
             plt.figure()
-
             sns.violinplot(y=tot_var_bands, positions=np.arange(5))
 
-        else:
+    def analyse_binSVM(self, plotting=False):
+        # BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
+        # So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
+        coeffs = stats.zscore(
+            np.sum(self.bin_classif["Model"].coef_.reshape(5, 257, order="C"), axis=0)
+        )  # what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
+
+        avg_coeffs = np.mean(np.array(self.bin_classif["Coeffs"]), axis=0).reshape(
+            5, 257, order="C"
+        )
+        coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
+        import_mask = coeffs > 0
+
+        if plotting:
             plt.figure()
             for ii in range(4):
                 # plt.hist(self.bin_classif['Model'].coef_[:,ii])
                 plt.scatter(ii, self.bin_classif["Model"].coef_[:, ii])
 
-            # BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
-            # So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
-            coeffs = stats.zscore(
-                np.sum(
-                    self.bin_classif["Model"].coef_.reshape(5, 257, order="C"), axis=0
-                )
-            )  # what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
-
-            avg_coeffs = np.mean(np.array(self.bin_classif["Coeffs"]), axis=0).reshape(
-                5, 257, order="C"
-            )
-            coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
-
-            plt.figure()
-            self.import_mask = coeffs > 0
             EEG_Viz.plot_3d_scalp(
                 coeffs,
                 unwrap=True,
@@ -2481,7 +2468,7 @@ class proc_dEEG:
                 marker_scale=5,
             )
             EEG_Viz.plot_3d_scalp(
-                self.import_mask.astype(int),
+                import_mask.astype(int),
                 unwrap=True,
                 label="Importance Mask",
                 scale=100,
@@ -2489,173 +2476,8 @@ class proc_dEEG:
                 alpha=0.3,
                 marker_scale=5,
             )
-            plt.suptitle("Just looking at the coefficients")
 
-    # THE BELOW FUNCTION DOES NOT RUN, JUST HERE FOR REFERENCE AS THE SVM IS BEING RECODED ABOVE
-    def OLDtrain_binSVM(self):
-        # %% PLOT THE WHOLE DATA
-        plt.figure()
-        Yall = np.zeros(SVM_labels.shape[0]).astype(np.float)
-
-        Yall[SVM_labels == "OffTON"] = 0
-        Yall[SVM_labels == "OnTON"] = 1
-        plt.imshow(Yall.reshape(1, -1), aspect="auto")
-
-        # split out into test and train
-        testing_size = 200 / 310
-        print("Total segments: " + str(dsgn_X.shape))
-
-        Xtr, Xte, Ytr, Yte = sklearn.model_selection.train_test_split(
-            dsgn_X, SVM_labels, test_size=testing_size, random_state=1230, shuffle=True
-        )
-        print("Training size " + str(Xtr.shape))
-
-        plt.figure()
-        trYall = np.zeros(Ytr.shape[0]).astype(np.float)
-        trYall[Ytr == "OffTON"] = 0
-        trYall[Ytr == "OnTON"] = 1
-
-        teYall = np.zeros(Yte.shape[0]).astype(np.float)
-        teYall[Yte == "OffTON"] = 0
-        teYall[Yte == "OnTON"] = 1
-
-        plt.imshow(np.hstack((trYall, teYall)).reshape(1, -1), aspect="auto")
-
-        # THIS HAS BEEN MOVED TO SEPARATE FUNCTION/METHOD IN THIS CLASS
-        # Just doing a learning curve on the training data
-        # tsize,tscore,vscore = learning_curve(svm.LinearSVC(penalty='l2',dual=False,C=1),Xtr,Ytr,train_sizes=np.linspace(0.4,1,10),shuffle=True,cv=5,random_state=0)
-        # plt.figure()
-        # plt.plot(tsize,np.mean(tscore,axis=1))
-        # plt.plot(tsize,np.mean(vscore,axis=1))
-
-        # classifier time itself
-        clf = svm.LinearSVC(penalty="l2", dual=False, C=1)
-        # Fit the actual algorithm
-
-        big_score = []
-        coeffs = []
-        nfold = 50
-        cv = StratifiedKFold(n_splits=nfold)
-
-        rocs = []
-        aucs = []
-        plt.figure()
-        for train, test in cv.split(Xtr, Ytr):
-            mod_score = clf.fit(Xtr[train], Ytr[train]).score(Xtr[test], Ytr[test])
-            outpred = clf.predict(Xtr[test])
-
-            Ytestr = np.zeros(Ytr[test].shape[0]).astype(np.float)
-            Ytestr[Ytr[test] == "OffTON"] = 0
-            Ytestr[Ytr[test] == "OnTON"] = 1
-
-            outpred[outpred == "OffTON"] = 0
-            outpred[outpred == "OnTON"] = 1
-
-            # pdb.set_trace()
-            outpred = outpred.astype(np.float)
-            fpr, tpr, thresholds = roc_curve(Ytestr, outpred)
-            auc_perf = roc_auc_score(Ytestr, outpred)
-            # rocs.append(roc_perf)
-            aucs.append(auc_perf)
-            plt.plot(fpr, tpr)
-
-            coeffs.append(clf.coef_)
-            # fpr,tpr,threshold = roc_curve(Ytr[test],probas)
-            # roc_auc = auc(fpr,tpr)
-            big_score.append(mod_score)
-        plt.ylim((0, 1))
-        coeffs = np.array(coeffs).squeeze().reshape(nfold, 5, -1)
-        print(aucs)
-        print("CV Scores: " + str(big_score))
-        plt.figure()
-        # pdb.set_trace()
-        # plt.plot(np.mean(coeffs,axis=0))
-        for ii in range(nfold):
-            plt.plot(coeffs[ii, :, :].T, alpha=0.2)
-        plt.legend(["Delta", "Theta", "Alpha", "Beta", "Gamma"])
-        plt.plot(np.mean(coeffs, axis=0).T, alpha=1)
-
-        # %% Now do fit on the full training set
-
-        # clf.fit(Xtr,Ytr)
-
-        # predict IN training set
-        predlabels = clf.predict(Xte)
-
-        plt.figure()
-        plt.subplot(2, 1, 1)
-
-        Yten = np.copy(Yte)
-        predlabelsn = np.copy(predlabels)
-
-        # Fix labels for PLOTTING
-        Yten[Yte == "OffTON"] = 0
-        Yten[Yte == "OnTON"] = 1
-        predlabelsn[predlabels == "OffTON"] = 0
-        predlabelsn[predlabels == "OnTON"] = 1
-
-        plt.imshow(
-            np.vstack((Yten.astype(np.int), predlabelsn.astype(np.int))), aspect="auto"
-        )
-        # plt.plot(Yte,label='test')
-        # plt.plot(predlabels,label='predict')
-        # simple_accuracy = np.sum(np.array(Yte) == np.array(predlabels))/len(Yte)
-        score = clf.score(Xte, Yte)
-        plt.title("SVM Results with Mask:" + str(mask) + " ; Accuracy: " + str(score))
-        plt.legend()
-
-        pickle.dump(clf, open("/tmp/SVMModel_l2", "wb"))
-
-        plt.subplot(2, 2, 3)
-        plt.plot(clf.coef_.reshape(5, -1).T)
-        plt.subplot(2, 2, 4)
-        conf_matrix = confusion_matrix(predlabels, Yte)
-        plt.imshow(conf_matrix)
-        plt.yticks(np.arange(0, 2), ["OffT", "OnT"])
-        plt.xticks(np.arange(0, 2), ["OffT", "OnT"])
-        plt.colorbar()
-
-        self.binSVM = clf
-        self.binSVM_dsgn_X = dsgn_X
-        self.binSVM_test_labels = predlabels
-
-    def OBScompute_diff(self, take_mean=True):
-        print("Computing Difference")
-        assert len(self.condits) >= 2
-        avg_psd = nestdict()
-        avg_change = nestdict()
-        var_psd = nestdict()
-
-        for pt in self.do_pts:
-            # avg_psd[pt] = defaultdict(dict)
-            # avg_change[pt] = defaultdict(dict)
-            for condit in self.condits:
-                # average all the epochs together
-                avg_psd[pt][condit] = {
-                    epoch: np.median(self.feat_dict[pt][condit][epoch], axis=1)
-                    for epoch in self.feat_dict[pt][condit].keys()
-                }
-                # if you want variance
-                # var_psd[pt][condit] = {epoch:np.var(self.feat_dict[pt][condit][epoch],axis=1) for epoch in self.feat_dict[pt][condit].keys()}
-                # if you want Mean Absolute Deviance
-                var_psd[pt][condit] = {
-                    epoch: robust.mad(self.feat_dict[pt][condit][epoch], axis=1)
-                    for epoch in self.feat_dict[pt][condit].keys()
-                }
-
-                keyoi = keys_oi[condit][1]
-
-                avg_change[pt][condit] = 10 * (
-                    np.log10(avg_psd[pt][condit][keyoi])
-                    - np.log10(avg_psd[pt][condit]["Off_3"])
-                )
-
-        self.psd_change = avg_change
-        self.psd_avg = avg_psd
-        # This is really just a measure of how dynamic the underlying process is, not of particular interest for Aim 3.1, maybe 3.3
-        self.psd_var = var_psd
-
-    def NEWcompute_diff(self):
+    def compute_diff(self):
         avg_change = {
             pt: {
                 condit: 10
