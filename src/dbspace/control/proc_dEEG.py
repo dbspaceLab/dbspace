@@ -43,6 +43,8 @@ from sklearn.model_selection import learning_curve, StratifiedKFold
 import pickle
 
 from dbspace.tools.r_pca import R_pca
+from typing import Tuple
+from numpy import ndarray
 
 # %%
 
@@ -2439,17 +2441,45 @@ class proc_dEEG:
             plt.figure()
             sns.violinplot(y=tot_var_bands, positions=np.arange(5))
 
+    def mask_binSVM_coeffs(self, analysis_approach = 'avg') -> Tuple[ndarray,ndarray]:
+        n_osc_feats, n_channs = 5, 257
+
+        match analysis_approach:
+            case 'avg':
+                avg_coeffs = np.mean(np.array(self.bin_classif["Coeffs"]), axis=0).reshape(
+                    n_osc_feats, n_channs, order="C"
+                )
+                z_scored_avg_coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
+            case 'raw':
+                coeff_extrude = self.bin_classif["Model"].coef_.reshape(
+                    n_osc_feats, n_channs, order="C"
+                )
+
+                coeffs1 = stats.zscore(
+                    np.sum(coeff_extrude, axis=0)
+                )  # what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
+
+        import_mask = coeffs > 0
+        return coeffs, import_mask
+
     def analyse_binSVM(self, plotting=False):
         # BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
         # So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
-        coeffs = stats.zscore(
-            np.sum(self.bin_classif["Model"].coef_.reshape(5, 257, order="C"), axis=0)
+        n_osc_feats, n_channs = 5, 257
+        coeff_extrude = self.bin_classif["Model"].coef_.reshape(
+            n_osc_feats, n_channs, order="C"
+        )
+
+        coeffs1 = stats.zscore(
+            np.sum(coeff_extrude, axis=0)
         )  # what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
 
         avg_coeffs = np.mean(np.array(self.bin_classif["Coeffs"]), axis=0).reshape(
-            5, 257, order="C"
+            n_osc_feats, n_channs, order="C"
         )
-        coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
+        z_scored_avg_coeffs = stats.zscore(np.sum(avg_coeffs**2, axis=0))
+        # for some reason, I decided to ignore "coeffs" above and instead sum through the avg coeffs taken from bin_classif coeffs?
+        coeffs = 
         import_mask = coeffs > 0
 
         if plotting:
