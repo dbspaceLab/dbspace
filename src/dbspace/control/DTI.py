@@ -107,6 +107,8 @@ class engaged_tractography:
     """
 
     def plot_engaged_tractography(self, condits=["OnT", "OffT"]):
+        if type(condits) is not list:
+            raise ValueError("condits should be a list of conditions to plot...")
         for cc, condit in enumerate(condits):
             engaged_tracto = self.get_engaged_tractography(condit=condit)
 
