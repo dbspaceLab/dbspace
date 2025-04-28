@@ -133,7 +133,14 @@ class engaged_tractography:
         return image.math_img(mean_string, **sum_args)
 
     def plot_preference_mask(self, condits=["OnT", "OffT"], threshold=0.05):
-        if len(condits) != 2:
+        """
+        The preference mask is a comparison of the engaged tractography for two conditions.
+        This method plots the engaged tractography for each condition and the difference between them.
+        :param condits: list of conditions to compare
+        :param threshold: threshold for the preference mask
+        :return:
+        """
+        if type(condits) is not list or len(condits) != 2:
             raise ValueError("Preference Mask needs two conditions to compare...")
 
         diff_map = nestdict()
