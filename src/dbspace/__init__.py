@@ -22,9 +22,12 @@ import random
 # IF you want to do OR related analyses, this needs to be uncommented
 # from brpylib import NsxFile
 
-import pdb
+import ipdb
 
 import matplotlib.pyplot as plt
+
+from typing import Union, Dict, List, Tuple
+from numpy import ndarray
 
 plt.rcParams["image.cmap"] = "jet"
 
@@ -243,20 +246,15 @@ def osc_state(inpX):
 """ Return to us the power in an oscillatory feature"""
 
 
-def get_pow(Pxx, F, frange, cmode=np.median):
+def get_pow(Pxx: Union[Dict, ndarray], F, frange, cmode=np.median):
     # Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
     # Pxx is assumed to NOT be log transformed, so "positive semi-def"
 
     # check if Pxx is NOT a dict
     if isinstance(Pxx, np.ndarray):
-        # Pxx = Pxx.reshape(-1,1)
-        # JUST ADDED THIS
         chann_order = range(Pxx.shape[0])
         Pxx = {ch: Pxx[ch, :] for ch in chann_order}
-        # except: pdb.set_trace()
 
-        # ThIS WAS WORKING BEFORE
-        # Pxx = {0:Pxx}
     elif len(Pxx.keys()) > 2:
         chann_order = np.arange(0, 257)
     else:
@@ -273,21 +271,21 @@ def get_pow(Pxx, F, frange, cmode=np.median):
     # for chans,psd in Pxx.items():
     for cc, chann in enumerate(chann_order):
         # let's make sure the Pxx we're dealing with is as expected and a true PSD
-        assert (Pxx[chann] > 0).all()
-
-        # if we want the sum
-        # out_feats[chans] = np.sum(psd[Fidxs])
-        # if we want the MEDIAN instead
+        try:
+            assert (Pxx[chann] >= 0).all()
+        except AssertionError:
+            print("Pxx is not a true PSD")
+            print(Pxx[chann])
+            print(chann)
+            print(Fidxs)
+            ipdb.set_trace()
 
         # log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
-        try:
-            out_feats[chann] = 10 * np.log10(cmode(Pxx[chann][Fidxs]))
-        except Exception as e:
-            print(e)
-            pdb.set_trace()
+        # VT 2025: The above isn't true tho...?!?!
+
+        out_feats[chann] = 10 * np.log10(cmode(Pxx[chann][Fidxs]))
 
     # return is going to be a dictionary with same elements
-
     return out_feats  # This returns the out_feats which are 10*log(Pxx)
 
 

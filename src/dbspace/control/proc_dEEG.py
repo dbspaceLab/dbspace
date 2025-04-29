@@ -117,8 +117,9 @@ class proc_dEEG:
         pretty_mode=False,
         polyfix=0,
     ):
-        self.chann_dim = 257
-        self.ch_order_list = range(self.chann_dim)
+        self.n_chann = 257
+        self.n_feats = len(dbo.feat_order)
+        self.ch_order_list = range(self.n_chann)
         self.procsteps = procsteps
 
         self.do_pts = pts
@@ -2313,6 +2314,24 @@ class proc_dEEG:
         self.bin_classif["Coeffs"] = coeffs
         self.cv_folding = nfold
 
+    def SVM_CV_Coeffs(self):
+        cv_coeffs = np.array(self.bin_classif["Coeffs"])
+        # this gives a folds x 1 x (chann x feats) array
+
+        cv_coeffs_avg_folds = np.median(cv_coeffs, axis=0)
+
+        dsgn_coeffs = cv_coeffs_avg_folds.reshape(257, 5, order="C")
+        print(dsgn_coeffs)
+        EEG_Viz.plot_3d_scalp(
+            dsgn_coeffs[:, 0],
+            unwrap=True,
+            label="Coefficients",
+            scale=100,
+            clims=(-0.01, 0.01),
+            alpha=0.3,
+            marker_scale=5,
+        )
+
     def bootstrap_binSVM(self):
         best_model = self.bin_classif
 
@@ -2724,8 +2743,7 @@ class proc_dEEG:
                     print("Doing " + pt + condit + epoch)
                     data_matr = self.ts_data[pt][condit][epoch]
                     data_dict = {
-                        ch: data_matr[ch, :, :].squeeze()
-                        for ch in range(self.chann_dim)
+                        ch: data_matr[ch, :, :].squeeze() for ch in range(self.n_chann)
                     }
                     CSD_dict[pt][condit][epoch], PLV_dict[pt][condit][epoch] = (
                         dbo.gen_coher(
