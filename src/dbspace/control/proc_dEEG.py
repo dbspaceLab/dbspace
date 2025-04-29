@@ -2309,12 +2309,15 @@ class proc_dEEG:
         # Find the best model
         best_model_idx = np.argmax(big_score)
         best_model = models[best_model_idx]
-        self.bin_classif["Model"] = best_model
-        self.bin_classif["Coeffs"] = coeffs
-        self.cv_folding = nfold
+
+        self.bin_classif["Model"]["Map"] = best_model
+        self.bin_classif["Model"]["Coefficients"] = best_model.coef_
+        self.bin_classif["Derivation"] = f"{nfold}-CV"
+        self.bin_classif["CV_Models"]["Maps"] = models
+        self.bin_classif["CV_Models"]["Coefficients"] = coeffs
 
     def bootstrap_binSVM(self):
-        best_model = self.bin_classif
+        best_model = self.bin_classif["Model"]
 
         # randomlt sample the validation set
         validation_accuracy = []
@@ -2327,8 +2330,8 @@ class proc_dEEG:
                 n_samples=int(round(total_segments * 0.6)),
                 replace=False,
             )
-            validation_accuracy.append(best_model["Model"].score(Xva_ss, Yva_ss))
-            predicted_Y = best_model["Model"].predict(Xva_ss)
+            validation_accuracy.append(best_model["Map"].score(Xva_ss, Yva_ss))
+            predicted_Y = best_model["Map"].predict(Xva_ss)
             fpr, tpr, _ = roc_curve(Yva_ss, predicted_Y)
             rocs_auc.append(auc(fpr, tpr))
 
@@ -2344,12 +2347,14 @@ class proc_dEEG:
         plt.title("ROC AUC")
 
     def oneshot_binSVM(self):
-        best_model = self.bin_classif
+        # Bring in the trained Classifier Structure
+
+        best_model = self.bin_classif["Model"]
         # Plotting of confusion matrix and coefficients
         # Validation set assessment now
 
-        validation_accuracy = best_model["Model"].score(self.Xva, self.Yva)
-        Ypred = best_model["Model"].predict(self.Xva)
+        validation_accuracy = best_model["Map"].score(self.Xva, self.Yva)
+        Ypred = best_model["Map"].predict(self.Xva)
         print(validation_accuracy)
 
         plt.figure()
@@ -2362,11 +2367,7 @@ class proc_dEEG:
         plt.colorbar()
 
         plt.subplot(2, 2, 2)
-        coeffs = (
-            np.array(best_model["Coeffs"])
-            .squeeze()
-            .reshape(self.cv_folding, 257, 5, order="C")
-        )
+        coeffs = np.array(best_model["Coefficients"]).squeeze()
         # plt.plot(coeffs,alpha=0.2)
         plt.plot(np.median(coeffs, axis=0))
         plt.title("Plotting Median Coefficients for CV-best Model performance")
