@@ -2235,10 +2235,7 @@ class proc_dEEG:
             # collapse along all segments and channels
             plot_stack = flat_dsgn_X.swapaxes(0, 2).reshape(5, -1, order="C")
             plt.figure()
-            try:
-                sns.violinplot(data=plot_stack, positions=np.arange(5))
-            except:
-                ipdb.set_trace()
+            sns.violinplot(data=plot_stack, positions=np.arange(5))
 
         return flat_dsgn_X, flat_dsgn_Y, num_segs
 
@@ -2273,18 +2270,6 @@ class proc_dEEG:
 
         self.SVM_raw_stack = SVM_stack
         return flat_dsgn_X, dsgn_Y, num_segs
-
-    """ WIP SVM masked classifier where channels can be toggled """
-
-    def masked_SVM(self):
-        # generate a mask
-
-        # what mask do we want?
-        self.SVM_Mask = np.zeros((257,)).astype(bool)
-        self.SVM_Mask[np.arange(216, 239)] = True
-
-        sub_X = self.SVM_stack[:, self.SVM_Mask, :]
-        dsgn_X = sub_X.reshape(num_segs, -1, order="C")
 
     """ Train our Binary SVM """
 
@@ -2391,15 +2376,6 @@ class proc_dEEG:
 
         self.SVM_coeffs = coeffs
 
-    def assess_binSVM(self):
-        best_model = self.bin_classif
-
-        for ii in range(100):
-            Xrs, Yrs = resample(self.Xva, self.Yva, 100)
-            valid_accuracy = best_model.score(Xva, Yva)
-
-    """Analysis of the binary SVM coefficients should be here"""
-
     def analyse_binSVM_CV(self, plotting=True):
         coeffs = self.SVM_coeffs  # if we want it for all the folds
 
@@ -2441,7 +2417,9 @@ class proc_dEEG:
             plt.figure()
             sns.violinplot(y=tot_var_bands, positions=np.arange(5))
 
-    def mask_binSVM_coeffs(self, analysis_approach="avg") -> Tuple[ndarray, ndarray]:
+    def mask_binSVM_coeffs(
+        self, analysis_approach="avg", importance_threshold: float = 0.1
+    ) -> Tuple[ndarray, ndarray]:
         n_osc_feats, n_channs = 5, 257
 
         match analysis_approach:
@@ -2459,7 +2437,11 @@ class proc_dEEG:
                     np.sum(coeff_extrude, axis=0)
                 )  # what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
 
-        import_mask = coeffs > 0
+        # find top channels
+        plt.figure()
+        plt.hist(coeffs, bins=10, range=(0, 1))
+        plt.show()
+        import_mask = coeffs > importance_threshold
         return coeffs, import_mask
 
     def analyse_binSVM(self, plotting=False, analysis_approach="avg"):
@@ -2471,11 +2453,6 @@ class proc_dEEG:
         )
 
         if plotting:
-            plt.figure()
-            for ii in range(4):
-                # plt.hist(self.bin_classif['Model'].coef_[:,ii])
-                plt.scatter(ii, self.bin_classif["Model"].coef_[:, ii])
-
             EEG_Viz.plot_3d_scalp(
                 coeffs,
                 unwrap=True,
