@@ -2314,20 +2314,34 @@ class proc_dEEG:
         self.bin_classif["Coeffs"] = coeffs
         self.cv_folding = nfold
 
-    def SVM_CV_Coeffs(self):
+    def SVM_CV_Coeffs(self, normalize=True):
         cv_coeffs = np.array(self.bin_classif["Coeffs"])
         # this gives a folds x 1 x (chann x feats) array
+        if np.isnan(cv_coeffs).any() is True:
+            raise ValueError("Coefficients have NaNs")
 
         cv_coeffs_avg_folds = np.median(cv_coeffs, axis=0)
 
         dsgn_coeffs = cv_coeffs_avg_folds.reshape(257, 5, order="C")
-        print(dsgn_coeffs)
+
+        if normalize:
+            row_max = dsgn_coeffs.max(axis=0)
+            dsgn_coeffs = dsgn_coeffs / row_max[np.newaxis, :]
+            dsgn_coeffs[np.isnan(dsgn_coeffs)] = 0
+
+        if np.isnan(dsgn_coeffs).any() is True:
+            raise ValueError("Coefficients have NaNs")
+
+        # mask anywhere the abs is bigger than something
+        dsgn_coeffs_absmax = np.abs(dsgn_coeffs).max(axis=1)
+        plt.hist(dsgn_coeffs_absmax)
+
         EEG_Viz.plot_3d_scalp(
-            dsgn_coeffs[:, 0],
+            dsgn_coeffs_absmax,
             unwrap=True,
             label="Coefficients",
             scale=100,
-            clims=(-0.01, 0.01),
+            clims=(-1, 1),
             alpha=0.3,
             marker_scale=5,
         )
