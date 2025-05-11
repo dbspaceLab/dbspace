@@ -22,6 +22,9 @@ from dbspace.utils.functions import unity
 from nilearn import image, plotting
 import copy
 import itertools
+from typing import Union
+
+WRITE_DIR = "/tmp/na_outputs/"
 
 
 class engaged_tractography:
@@ -106,11 +109,13 @@ class engaged_tractography:
     This method plots the DTI for a given patient x condition combination
     """
 
-    def plot_engaged_tractography(self, condits=["OnT", "OffT"]):
+    def plot_engaged_tractography(self, condits=["OnT", "OffT"], export_files=False):
         if type(condits) is not list:
             raise ValueError("condits should be a list of conditions to plot...")
         for cc, condit in enumerate(condits):
-            engaged_tracto = self.get_engaged_tractography(condit=condit)
+            engaged_tracto = self.calc_engaged_tractography(
+                condit=condit, export_file=export_files
+            )
 
             plotting.plot_glass_brain(
                 engaged_tracto,
@@ -120,7 +125,7 @@ class engaged_tractography:
                 vmax=15,
             )
 
-    def get_engaged_tractography(self, condit):
+    def calc_engaged_tractography(self, condit, export_file=False):
         dti_data = self.dti_data
 
         avg_image = [dti_data[pt][condit] for pt in self.do_pts]
@@ -130,7 +135,90 @@ class engaged_tractography:
         mean_string = "np.mean(np.array([" + ",".join(keys) + "]),axis=0)"
         sum_args = {f"img{n}": dti_data[pt][condit] for n, pt in enumerate(self.do_pts)}
 
-        return image.math_img(mean_string, **sum_args)
+        return_image = image.math_img(mean_string, **sum_args)
+
+        if export_file:
+            if type(export_file) is str:
+                write_filepath = export_file
+            else:
+                write_filepath = WRITE_DIR + "engaged_tractography_"
+            return_image.to_filename(write_filepath + condit + ".nii.gz")
+
+        return return_image
+
+    def calculate_preference_diff(
+        self, condits=["OnT", "OffT"], export_file: Union[bool, str] = False
+    ):
+        diff_map = nestdict()
+        for condit_ordered in itertools.product(condits, repeat=2):
+            if condit_ordered[0] == condit_ordered[1]:
+                continue
+            diff_map[condit_ordered[0]] = image.math_img(
+                "img1 - img2",
+                img1=self.calc_engaged_tractography(condit=condit_ordered[0]),
+                img2=self.calc_engaged_tractography(condit=condit_ordered[1]),
+            )
+            if export_file is True:
+                if type(export_file) is str:
+                    write_filepath = export_file
+                else:
+                    write_filepath = WRITE_DIR + "pref_tractography_"
+                diff_map.to_filename(
+                    write_filepath
+                    + condit_ordered[0]
+                    + "_minus_"
+                    + condit_ordered[1]
+                    + ".nii.gz"
+                )
+        return diff_map
+
+    def plot_preference_diff(self, condits=["OnT", "OffT"]):
+        diff_map = self.calculate_preference_diff(condits=condits, export_file=False)
+        for target in condits:
+            plotting.plot_glass_brain(
+                diff_map[target],
+                black_bg=True,
+                title=target + " Engaged Preference Diff",
+                vmin=-10,
+                vmax=10,
+            )
+
+    def calculate_preference_mask(
+        self,
+        condits=["OnT", "OffT"],
+        threshold=0.05,
+        export_file: Union[bool, str] = False,
+    ):
+        """
+        The preference mask is a comparison of the engaged tractography for two conditions.
+        This method calculates the engaged tractography for each condition and the difference between them.
+        :param condits: list of conditions to compare
+        :param threshold: threshold for the preference mask
+        :return:
+        """
+        if type(condits) is not list or len(condits) != 2:
+            raise ValueError("Preference Mask needs two conditions to compare...")
+
+        diff_map = nestdict()
+        dti_data = {key: self.calc_engaged_tractography(condit=key) for key in condits}
+        for ccs in itertools.product(condits, repeat=2):
+            if ccs[0] == ccs[1]:
+                continue
+            diff_map[ccs[0]] = image.math_img(
+                "img1 > img2+" + str(threshold),
+                img1=dti_data[ccs[0]],
+                img2=dti_data[ccs[1]],
+            )
+
+        if export_file is True:
+            if type(export_file) is str:
+                write_filepath = export_file
+            else:
+                write_filepath = WRITE_DIR + "pref_tractography_"
+            for target in condits:
+                diff_map[target].to_filename(write_filepath + target + ".nii.gz")
+
+        return diff_map
 
     def plot_preference_mask(self, condits=["OnT", "OffT"], threshold=0.05):
         """
@@ -143,17 +231,7 @@ class engaged_tractography:
         if type(condits) is not list or len(condits) != 2:
             raise ValueError("Preference Mask needs two conditions to compare...")
 
-        diff_map = nestdict()
-        dti_data = {key: self.get_engaged_tractography(condit=key) for key in condits}
-        for ccs in itertools.product(condits, repeat=2):
-            if ccs[0] == ccs[1]:
-                continue
-            diff_map[ccs[0]] = image.math_img(
-                "img1 > img2+" + str(threshold),
-                img1=dti_data[ccs[0]],
-                img2=dti_data[ccs[1]],
-            )
-
+        diff_map = self.calculate_preference_mask(condits=condits, threshold=threshold)
         for target in condits:
             plotting.plot_glass_brain(
                 diff_map[target],
