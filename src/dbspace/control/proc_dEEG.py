@@ -539,16 +539,32 @@ class proc_dEEG:
     ):
         band_i = dbo.feat_order.index(band)
 
-        # medians = self.median_response(pt=pt)
+        segments_dict = self.osc_bl_norm[pt]
+        segments_tidx_dict = self.osc_bl_norm_timeidx[pt]
+
         if seg_lim is None:
             seg_lim = slice(None)
         else:
+            seg_lower = seg_lim[0]
+            seg_upper = seg_lim[1]
             seg_lim = slice(seg_lim[0], seg_lim[1])
 
         for condit in do_condits:
-            response_dict = np.median(
-                self.osc_bl_norm[pt][condit][seg_lim, :, :], axis=0
-            ).squeeze()
+            if pt == "POOL":
+                intermediate_segments = [
+                    seg
+                    for seg, idx in zip(
+                        segments_dict[condit], segments_tidx_dict[condit]
+                    )
+                    if idx < seg_upper and idx >= seg_lower
+                ]
+                response_dict = np.median(
+                    np.array(intermediate_segments), axis=0
+                ).squeeze()
+            else:
+                response_dict = np.median(
+                    self.osc_bl_norm[pt][condit][seg_lim, :, :], axis=0
+                ).squeeze()
             # The old scatterplot approach
             if use_maya:
                 eeg3d.maya_band_display(response_dict[:, band_i])
