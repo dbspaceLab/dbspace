@@ -16,7 +16,7 @@ import time
 
 
 def return_adj_net(dist_thresh=3):
-    egipos = mne.channels.read_montage("/tmp/GSN-HydroCel-257.sfp")
+    egipos = mne.channels.read_montage(dbo.GSN_LOCS)
     etrodes = egipos.pos
 
     dist = np.zeros((257, 257))
@@ -32,7 +32,7 @@ def return_adj_net(dist_thresh=3):
 
 def get_coords(scale, montage="dense"):
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
@@ -112,7 +112,7 @@ def plot_3d_scalp(
     band,
     infig=[],
     n=1,
-    clims=(0, 0),
+    clims=None,
     scale=1,
     label="generic",
     animate=False,
@@ -126,7 +126,7 @@ def plot_3d_scalp(
     # fig = plt.figure()
 
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
@@ -139,7 +139,7 @@ def plot_3d_scalp(
 
     cm = plt.cm.get_cmap("jet")
 
-    if clims == (0, 0):
+    if clims == None:
         clims = (np.min(band), np.max(band))
 
     if unwrap:

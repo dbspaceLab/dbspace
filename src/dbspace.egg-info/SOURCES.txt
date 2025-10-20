@@ -14,6 +14,10 @@ src/dbspace/control/network_action.py
 src/dbspace/control/proc_dEEG.py
 src/dbspace/control/stream_dEEG.py
 src/dbspace/control/stream_dLFP.py
+src/dbspace/control/support.py
+src/dbspace/control/classifiers/__init__.py
+src/dbspace/control/classifiers/gmm.py
+src/dbspace/control/classifiers/svm.py
 src/dbspace/dLFP/__init__.py
 src/dbspace/dLFP/diff_model.py
 src/dbspace/dLFP/impedances.py
@@ -30,7 +34,13 @@ src/dbspace/readout/decoder.py
 src/dbspace/readout/PAC/PyPAC.py
 src/dbspace/readout/PAC/SyntheticSignalTesting.py
 src/dbspace/readout/PAC/__init__.py
+src/dbspace/tools/__init__.py
 src/dbspace/tools/new_spot_check.py
+src/dbspace/tools/r_pca/__init__.py
+src/dbspace/utils/__init__.py
+src/dbspace/utils/costs.py
+src/dbspace/utils/functions.py
+src/dbspace/utils/structures.py
 src/dbspace/visualizations/__init__.py
 src/dbspace/visualizations/d2/EEG_Viz.py
 src/dbspace/visualizations/d2/__init__.py

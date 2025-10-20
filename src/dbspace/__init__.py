@@ -12,28 +12,32 @@ This is the primary file with the methods needed for the rest of the libraries. 
 
 """
 
-print("Using DBSpace LATEST")
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
 import random
+from dotenv import load_dotenv
 
 # IF you want to do OR related analyses, this needs to be uncommented
 # from brpylib import NsxFile
-
-import ipdb
-
 import matplotlib.pyplot as plt
 
 from typing import Union, Dict, List, Tuple
 from numpy import ndarray
+import os
+
+load_dotenv()
+
+print("Using DBSpace LATEST")
 
 plt.rcParams["image.cmap"] = "jet"
-
 np.seterr(divide="raise")
 
 all_pts = ["901", "903", "905", "906", "907", "908"]
+
+GSN_LOCS = os.getenv("GSN_LOCS")
+print(f"GSN_LOCS: {GSN_LOCS}")
 
 # This is our map for the electrodes that each patient has for ONTarget and OFFTarget
 Etrode_map = {

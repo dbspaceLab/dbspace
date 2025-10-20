@@ -133,9 +133,7 @@ class proc_dEEG:
         # Load in the data
         self.ts_data = self.load_data(pts)
 
-        self.eeg_locs = mne.channels.read_custom_montage(
-            "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
-        )
+        self.eeg_locs = mne.channels.read_custom_montage(dbo.GSN_LOCS)
 
         self.gen_output_variables()
 
@@ -2314,7 +2312,7 @@ class proc_dEEG:
         self.bin_classif["Coeffs"] = coeffs
         self.cv_folding = nfold
 
-    def SVM_CV_Coeffs(self, normalize=True):
+    def SVM_CV_Coeffs(self, normalize=True, plot_hist=False):
         cv_coeffs = np.array(self.bin_classif["Coeffs"])
         # this gives a folds x 1 x (chann x feats) array
         if np.isnan(cv_coeffs).any() is True:
@@ -2334,7 +2332,8 @@ class proc_dEEG:
 
         # mask anywhere the abs is bigger than something
         dsgn_coeffs_absmax = np.abs(dsgn_coeffs).max(axis=1)
-        plt.hist(dsgn_coeffs_absmax)
+        if plot_hist:
+            plt.hist(dsgn_coeffs_absmax)
 
         EEG_Viz.plot_3d_scalp(
             dsgn_coeffs_absmax,
@@ -2386,26 +2385,26 @@ class proc_dEEG:
         print(validation_accuracy)
 
         plt.figure()
-        plt.subplot(1, 2, 1)
+        fig, (ax1, ax2) = plt.subplots(2, 2, figsize=(10, 10))
+        # plt.subplot(1, 2, 1)
         # confusion matrix here
         conf_matrix = confusion_matrix(Ypred, self.Yva)
-        plt.imshow(conf_matrix)
-        plt.yticks(np.arange(0, 2), ["OffT", "OnT"])
-        plt.xticks(np.arange(0, 2), ["OffT", "OnT"])
-        plt.colorbar()
+        ax1[0].imshow(conf_matrix)
+        # ax1[0].yticks(np.arange(0, 2), ["OffT", "OnT"])
+        # ax1[0].xticks(np.arange(0, 2), ["OffT", "OnT"])
+        # ax1[0].colorbar()
+        # fig.colorbar(im, cax=cax, orientation='vertical')
 
-        plt.subplot(2, 2, 2)
         coeffs = (
             np.array(best_model["Coeffs"])
             .squeeze()
             .reshape(self.cv_folding, 257, 5, order="C")
         )
         # plt.plot(coeffs,alpha=0.2)
-        plt.plot(np.median(coeffs, axis=0))
-        plt.title("Plotting Median Coefficients for CV-best Model performance")
+        ax2[0].plot(np.median(coeffs, axis=0))
+        # ax2[0].title("Plotting Median Coefficients for CV-best Model performance")
 
-        plt.subplot(2, 2, 4)
-        plt.plot(np.median(np.median(coeffs, axis=0), axis=0))
+        ax2[1].plot(np.median(np.median(coeffs, axis=0), axis=0))
 
         self.SVM_coeffs = coeffs
 

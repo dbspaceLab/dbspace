@@ -21,7 +21,7 @@ import pyvista as pv
 
 
 def return_adj_net(dist_thresh=3):
-    egipos = mne.channels.read_montage("/tmp/GSN-HydroCel-257.sfp")
+    egipos = mne.channels.read_montage(dbo.GSN_LOCS)
     etrodes = egipos.pos
 
     dist = np.zeros((257, 257))
@@ -37,7 +37,7 @@ def return_adj_net(dist_thresh=3):
 
 def get_coords(scale, montage="dense"):
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
@@ -132,7 +132,7 @@ def plot_3d_scalp(
     # fig = plt.figure()
 
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
@@ -330,7 +330,7 @@ def plot_tracts(band, active_mask=[], rad=[], color=[0.0, 0.0, 0.0], alpha=1):
 
 def maya_band_display(band_power, montage="dense", label=""):
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
@@ -371,7 +371,7 @@ def plot_maya_scalp(
     alpha=1,
 ):
     if montage == "dense":
-        fname = "/home/virati/Dropbox/GSN-HydroCel-257.sfp"
+        fname = dbo.GSN_LOCS
     elif montage == "standard":
         fname = "/home/virati/Dropbox/standard_postfixed.elc"
 
