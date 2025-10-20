@@ -30,6 +30,7 @@ from dbspace.visualizations.d3 import EEG_Viz as eeg3d
 import seaborn as sns
 
 
+from typing import Optional
 from dbspace import nestdict
 
 from statsmodels import robust
@@ -364,6 +365,15 @@ class proc_dEEG:
             }
             for pt in self.do_pts
         }
+        self.osc_bl_norm_timeidx = {
+            pt: {
+                condit: np.arange(
+                    self.osc_dict[pt][condit][keys_oi[condit][1]].shape[0]
+                )
+                for condit in self.condits
+            }
+            for pt in self.do_pts
+        }
         self.osc_bl_norm["POOL"] = {
             condit: np.concatenate(
                 [
@@ -371,6 +381,12 @@ class proc_dEEG:
                     - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]], axis=0)
                     for pt in self.do_pts
                 ]
+            )
+            for condit in self.condits
+        }
+        self.osc_bl_norm_timeidx["POOL"] = {
+            condit: np.concatenate(
+                [self.osc_bl_norm_timeidx[pt][condit] for pt in self.do_pts]
             )
             for condit in self.condits
         }
@@ -517,16 +533,21 @@ class proc_dEEG:
             plt.violinplot(ch_bl_mean)
             plt.violinplot(ch_stim_mean)
 
+    # TODO Remove all use_maya
     def topo_median_response(
-        self, pt="POOL", band="Alpha", do_condits=[], use_maya=False
+        self, pt="POOL", band="Alpha", do_condits=[], use_maya=False, seg_lim=None
     ):
         band_i = dbo.feat_order.index(band)
 
         # medians = self.median_response(pt=pt)
+        if seg_lim is None:
+            seg_lim = slice(None)
+        else:
+            seg_lim = slice(seg_lim[0], seg_lim[1])
 
         for condit in do_condits:
             response_dict = np.median(
-                self.osc_bl_norm[pt][condit][:, :, :], axis=0
+                self.osc_bl_norm[pt][condit][seg_lim, :, :], axis=0
             ).squeeze()
             # The old scatterplot approach
             if use_maya:
@@ -1480,7 +1501,13 @@ class proc_dEEG:
 
     """Plot the population medians"""
 
-    def pop_meds(self, response=True, pt="POOL"):
+    def pop_meds(
+        self,
+        response=True,
+        pt="POOL",
+        weigh_mad=0.3,
+        seg_lim: Optional[Tuple[int, int]] = None,
+    ):
         print("Doing Population Meds/Mads on Oscillatory RESPONSES")
 
         # THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
@@ -1492,13 +1519,18 @@ class proc_dEEG:
         X_med = nestdict()
         X_mad = nestdict()
         X_segnum = nestdict()
-        # do some small simple crap here
+
+        #
+        if seg_lim is None:
+            seg_lim = slice(None)
+        else:
+            seg_lim = slice(seg_lim[0], seg_lim[1])
 
         # Here we're averaging across axis zero which corresponds to 'averaging' across SEGMENTS
         for condit in self.condits:
             # Old version just does one shot median
-            X_med[condit] = 10 * np.median(dsgn_X[condit], axis=0)
-            X_med[condit] = 10 * np.mean(dsgn_X[condit], axis=0)
+            X_med[condit] = 10 * np.median(dsgn_X[condit][seg_lim], axis=0)
+            X_med[condit] = 10 * np.mean(dsgn_X[condit][seg_lim], axis=0)
 
             # VARIANCE HERE
 
@@ -1508,15 +1540,11 @@ class proc_dEEG:
 
         self.Seg_Med = (X_med, X_mad, X_segnum)
 
-        weigh_mad = 0.3
-        try:
-            self.median_mask = (
-                np.abs(self.Seg_Med[0]["OnT"][:, 2])
-                - weigh_mad * self.Seg_Med[1]["OnT"][:, 2]
-                >= 0
-            )
-        except:
-            pdb.set_trace()
+        self.median_mask = (
+            np.abs(self.Seg_Med[0]["OnT"][:, 2])
+            - weigh_mad * self.Seg_Med[1]["OnT"][:, 2]
+            >= 0
+        )
 
         # Do a quick zscore to zero out the problem channels
         chann_patt_zs = stats.zscore(X_med["OnT"], axis=0)

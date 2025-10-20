@@ -7,6 +7,7 @@ Created on Fri Jan 27 11:23:06 2017
 This library is a small quick library for 3d plotting of EEG
 """
 
+import dbspace as dbo
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
