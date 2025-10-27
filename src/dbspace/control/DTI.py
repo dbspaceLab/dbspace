@@ -205,7 +205,7 @@ class engaged_tractography:
             if ccs[0] == ccs[1]:
                 continue
             diff_map[ccs[0]] = image.math_img(
-                "img1 > img2+" + str(threshold),
+                "img1 > img2 +" + str(threshold),
                 img1=dti_data[ccs[0]],
                 img2=dti_data[ccs[1]],
             )
