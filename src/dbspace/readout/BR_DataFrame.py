@@ -10,6 +10,7 @@ The PURPOSE of this library should be to just bring in the BrainRadio data in a 
 For example: Determining which phase a recording belongs to will NOT be done in this script, that is under the perview of the DSV
 
 """
+
 import datetime
 import glob
 import json
@@ -31,10 +32,12 @@ from dbspace.signal.oscillations import FEAT_DICT, gen_psd
 from dbspace.utils.io.pcs import load_br_file
 from dbspace.utils.functions import nearest
 
+
 @dataclass
 class br_config:
-    seconds_from_end : int
-    sampling_rate : int
+    seconds_from_end: int
+    sampling_rate: int
+
 
 class BR_Data_Tree:
     """
@@ -47,9 +50,9 @@ class BR_Data_Tree:
         frame_label=None,
         clin_vector_file=None,
         do_pts=["901", "903", "905", "906", "907", "908"],
-        input_data_directory = None,
-        output_intermediate_directory = None,
-        analysis_configuration : br_config = None
+        input_data_directory=None,
+        output_intermediate_directory=None,
+        analysis_configuration: br_config = None,
     ):
         if input_data_directory is None:
             self.input_data_directory = "/data"
@@ -64,7 +67,7 @@ class BR_Data_Tree:
             self.output_data_directory = output_intermediate_directory
 
         if analysis_configuration is None:
-            analysis_configuration = br_config(seconds_from_end = 10, sampling_rate = 422)
+            analysis_configuration = br_config(seconds_from_end=10, sampling_rate=422)
 
         self.analysis_configuration = analysis_configuration
 
@@ -81,11 +84,11 @@ class BR_Data_Tree:
 
         if frame_label is None:
             # construct from date
-            frame_label = str(datetime.today())
-        
+            frame_label = str(datetime.datetime.today())
+
         self._frame_label = frame_label
 
-    def run_loading(self, premade_frame_file = None):
+    def run_loading(self, premade_frame_file=None):
         if Path(
             self.output_data_directory + "/ChronicFrame_" + self._frame_label
         ).is_file():
@@ -208,11 +211,12 @@ class BR_Data_Tree:
             raise ValueError("Error in the bad flag parsing...")
 
     """This method parses the root data structure and populates a list of recordings"""
+
     def list_files(self):
         file_list = []
         for pt in self.do_pts:
             for filename in glob.iglob(
-                self.input_data_directory + "/" + pt + "/**/" + "*.txt", recursive=True
+                str(self.input_data_directory / pt / "**" / "*.txt"), recursive=True
             ):
                 # Append the full path to a list
                 # check the file's STRUCTURE HERE
@@ -266,8 +270,11 @@ class BR_Data_Tree:
     def extract_gains(self, fname):
         xml_fname = fname.split(".")[0] + ".xml"
 
-    def extract_pt(self, fname):
-        return fname.split("brain_radio")[1][1:4]
+    def extract_pt(self, fname, split_string=None):
+        if split_string is None:
+            split_string = "lfp"
+            logging.warning(f"Using Default Split String of '{split_string}'")
+        return fname.split(split_string)[1][1:4]
 
     def build_phase_dict(self):
         # In this method we go in and map the date of our sessions to the phase that the patient was in
@@ -359,8 +366,7 @@ class BR_Data_Tree:
                 if rr["Data"][ch].all() == 0:
                     print("PROBLEM: " + str(rr) + " has a zero PSD in channel " + ch)
 
-        logging.info('Meta Checks Complete')
-        
+        logging.info("Meta Checks Complete")
 
     def prune_meta(self):
         print("Pruning out recordings that have no Phase in main study...")
@@ -383,7 +389,9 @@ class BR_Data_Tree:
         if domain == "F":
             self.data_basis[domain] = np.linspace(0, self.sampling_rate / 2, 2**9 + 1)
         elif domain == "T":
-            self.data_basis[domain] = np.linspace(0, self.analysis_configuration.seconds_from_end)
+            self.data_basis[domain] = np.linspace(
+                0, self.analysis_configuration.seconds_from_end
+            )
 
         for rr in self.file_meta:
             # load in the file
@@ -432,7 +440,6 @@ class BR_Data_Tree:
         F = defaultdict(dict)
 
         if domain == "T":
-
             return X
 
         elif domain == "F":
@@ -444,7 +451,7 @@ class BR_Data_Tree:
 
             return F
 
-    #%%
+    # %%
     # Plotting methods in the class
     def plot_file_PSD(self, fname=""):
         if fname != "":
@@ -470,7 +477,6 @@ class BR_Data_Tree:
         total_recs = len(tss["Left"])
         rnd_idxs = random.sample(range(1, total_recs), 100)
         for ii in rnd_idxs:
-
             b, a = signal.butter(5, w, "low")
             try:
                 output = signal.filtfilt(b, a, tss["Right"][ii].squeeze())
@@ -509,7 +515,7 @@ class BR_Data_Tree:
         plt.ylabel("Power (dB)")
         plt.legend({"Therapy", "NoTherapy"})
 
-        #%%
+        # %%
         [
             plt.plot(fvect, np.log10(rr["Data"]["Left"]), alpha=0.1)
             for rr in self.file_meta
