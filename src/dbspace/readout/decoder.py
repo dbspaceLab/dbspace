@@ -250,8 +250,8 @@ class base_decoder:
             plt.legend()
             plt.subplot(212)
             plt.plot(self.decode_model.coef_)
-            plt.hlines(0, -2, 10, linestyle="dotted")
-            plt.xticks(np.arange(10), self.feat_labels)
+            plt.hlines(0, -2, len(self.feat_labels), linestyle="dotted")
+            plt.xticks(np.arange(len(self.feat_labels)), self.feat_labels, rotation=45, ha="right")
 
     """setup our data for the TESTING"""
 
@@ -389,8 +389,8 @@ class base_decoder:
                 np.max(np.abs(active_coeffs)) - 0.01,
             )
         )
-        plt.xlim((-1, 10))
-        plt.xticks(np.arange(10), self.feat_labels)
+        plt.xlim((-1, len(self.feat_labels)))
+        plt.xticks(np.arange(len(self.feat_labels)), self.feat_labels, rotation=45, ha="right")
 
     def plot_test_ensemble(self):
         plt.figure()
@@ -492,7 +492,12 @@ class weekly_decoder(base_decoder):
         elif kwargs["algo"] == "Lasso":
             self.regression_algo = LassoCV()
 
-        if kwargs["variance"] == True:
+        if kwargs["variance"] == "both":
+            self.variance_analysis = "both"
+            mean_labels = ["L" + f for f in self.do_feats] + ["R" + f for f in self.do_feats]
+            var_labels = ["var_L" + f for f in self.do_feats] + ["var_R" + f for f in self.do_feats]
+            self.feat_labels = mean_labels + var_labels
+        elif kwargs["variance"] == True:
             self.variance_analysis = True
 
     def train_model(self):
@@ -512,7 +517,9 @@ class weekly_decoder(base_decoder):
                 ]
                 if block_set != []:
                     y_set, c_set = self.calculate_states_in_set(block_set)
-                    if self.variance_analysis:
+                    if self.variance_analysis == "both":
+                        weekly_y_set = np.concatenate([np.mean(y_set, axis=0), np.var(y_set, axis=0)])
+                    elif self.variance_analysis:
                         weekly_y_set = np.var(y_set, axis=0)
                     else:
                         weekly_y_set = np.mean(y_set, axis=0)
@@ -948,9 +955,12 @@ class weekly_decoderCV(weekly_decoder):
 
         average_model, _ = self.get_average_model(self.decode_model_combos_)
         plt.plot(average_model)
-        plt.hlines(0, -2, 11, linestyle="dotted")
+        n_feats = len(self.feat_labels)
+        plt.hlines(0, -2, n_feats + 1, linestyle="dotted")
         plt.ylim((-0.2, 0.2))
-        plt.xlim((-1, len(self.do_feats) * 2))
+        plt.xlim((-1, n_feats))
+        plt.xticks(np.arange(n_feats), self.feat_labels, rotation=45, ha="right")
+        plt.tight_layout()
 
 
 class controller_analysis:
