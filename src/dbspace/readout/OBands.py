@@ -4,8 +4,9 @@ log = logging.getLogger(__name__)
 
 import dbspace as dbo
 from dbspace.utils.structures import nestdict
-
 from dbspace.utils.functions import unity
+from dbspace.readout.ClinVect import Phase_List
+from dbspace.signal.oscillations import FEAT_DICT, poly_subtr
 import scipy.stats as stats
 import numpy as np
 
@@ -207,7 +208,7 @@ class OBands:
         return inp_psd - pchann
 
     def feat_extract(self, do_corrections=False):
-        full_feat_dict = dbo.signal.oscillations.FEAT_DICT
+        full_feat_dict = FEAT_DICT
 
         big_list = self.BRFrame.file_meta
         # go through ALL files and do the feature extraction
@@ -223,18 +224,20 @@ class OBands:
                         datacontainer, self.BRFrame.data_basis["F"], dofunc["param"]
                     )
                 else:
-                    pre_correction = {ch: rr["Data"][ch] for ch in rr["Data"].keys()}
-                    datacontainer, _ = dbo.signal.oscillations.poly_subtr(
-                        input_psd=pre_correction, fvect=self.BRFrame.data_basis["F"]
-                    )
+                    fvect = self.BRFrame.data_basis["F"]
+                    datacontainer = {}
+                    for ch in rr["Data"].keys():
+                        datacontainer[ch], _ = poly_subtr(
+                            input_psd=rr["Data"][ch], fvect=fvect
+                        )
                     output_feats[featname] = dofunc["fn"](
-                        datacontainer, self.BRFrame.data_basis["F"], dofunc["param"]
+                        datacontainer, fvect, dofunc["param"]
                     )
 
             rr.update({"FeatVect": output_feats})
 
     def patient_stacks(self, pt_list):
-        weeks = dbo.readout.ClinVect.Phase_List("ephys")
+        weeks = Phase_List("ephys")
         pt_stacks = {}
 
         for pt in pt_list:
@@ -577,7 +580,7 @@ class OBands:
     ):
         # generate our data to visualize
         if weeks == "all":
-            weeks = dbo.Phase_List("ephys")
+            weeks = Phase_List("ephys")
         if pt == "all":
             pt = dbo.all_pts
 
