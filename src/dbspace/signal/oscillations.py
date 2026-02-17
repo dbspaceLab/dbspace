@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from dbspace.utils.costs import l2_pow
 from dbspace.utils.structures import nestdict
 
-#%%
+# %%
 # Basic functions for rotating recordings into particular frames
 
 
@@ -36,7 +36,6 @@ def gen_psd(inpX, Fs=422, nfft=2**10, polyord=0):
 
         if inpX[chann].ndim > 1:
             for seg in range(inpX[chann].shape[-1]):
-
                 psd = np.abs(
                     F_Domain(inpX[chann][:, seg].squeeze(), Fs=Fs, nfft=nfft)["Pxx"]
                 )  # Just enveloped this with np.abs 12/15/2020
@@ -57,7 +56,7 @@ def gen_psd(inpX, Fs=422, nfft=2**10, polyord=0):
     return outPSD
 
 
-#%%
+# %%
 """Below used to be called poly_subtrLFP, unclear whether it was being used, now renamed and look for errors elsewhere"""
 
 
@@ -88,7 +87,7 @@ def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
     return outSG
 
 
-#%%
+# %%
 # Function to go through and find all the features from the PSD structure of dbo
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
     # psdIn is a VECTOR, yvect is the basis vector
@@ -141,6 +140,7 @@ def featDict_to_Matr(featDict):
 
     return ret_matr
 
+
 def get_pow(Pxx, F, frange, cmode=np.median):
     # Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
     # Pxx is assumed to NOT be log transformed, so "positive semi-def"
@@ -170,7 +170,11 @@ def get_pow(Pxx, F, frange, cmode=np.median):
     # for chans,psd in Pxx.items():
     for cc, chann in enumerate(chann_order):
         # let's make sure the Pxx we're dealing with is as expected and a true PSD
-        assert (Pxx[chann] > 0).all()
+        if not (Pxx[chann] > 0).all():
+            logging.warning(
+                f"Non-positive values found in Pxx for channel {chann}. Check input PSD. Skipping..."
+            )
+            continue
 
         # if we want the sum
         # out_feats[chans] = np.sum(psd[Fidxs])
@@ -265,7 +269,6 @@ def poly_subtr(input_psd: np.ndarray, fvect: np.ndarray = None, polyord: int = 4
     # log10 in_psd first
     if fvect is None:
         fvect = np.linspace(0, 1, input_psd.shape[0])
-    
 
     log_psd = 10 * np.log10(input_psd)
     pfit = np.polyfit(fvect, log_psd, polyord)
@@ -403,7 +406,7 @@ def featDict_to_Matr(featDict):
     return ret_matr
 
 
-#%%
+# %%
 # Variables related to what we're soft-coding as our feature library
 FEAT_DICT = {
     "Delta": {"fn": get_pow, "param": (1, 4)},
@@ -432,7 +435,7 @@ DEFAULT_FEAT_ORDER = [
 ]  # ,'fSlope','nFloor']
 
 
-#%%
+# %%
 # Plotting functions
 
 

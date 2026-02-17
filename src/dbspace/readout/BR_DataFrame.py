@@ -88,34 +88,32 @@ class BR_Data_Tree:
 
         self._frame_label = frame_label
 
-    def run_loading(self, premade_frame_file=None):
-        if Path(
-            self.output_data_directory + "/ChronicFrame_" + self._frame_label
-        ).is_file():
-            logging.info(
-                "Loading in %s frame from intermediate file cache...", frame_label
-            )
-        else:
-            # make a new frame
+    def run_loading(self, config=None, premade_frame_file=None):
+        if premade_frame_file is not None:
+            logging.info("Loading in pre-made frame from %s...", premade_frame_file)
+            raise NotImplementedError("Pre-made frame loading not implemented yet.")
+
+        if config is not None:
+            # check to see if there's a premade_frame_file that matches the config already
             pass
 
         self.data_basis = defaultdict()
 
-        if premade_frame_file is None:
-            print("Generating the dataframe...")
-            self.generate_sequence()
-            # Save it now
-            self.Save_Frame()
-            # Now just dump us out so we can do whatever we need to with the file above
-
-        else:
-            # IF we're loading in a preframe, we're probably doing a bigger analysis
-            self.preFrame_file = premade_frame_file
-            print("Loading in PreFrame..." + self.preFrame_file)
-            self.Import_Frame(self.preFrame_file)
+        print("Generating the dataframe...")
+        self.generate_sequence()
+        # Save it now
+        # self.Save_Frame()
+        # Now just dump us out so we can do whatever we need to with the file above
 
         return self
-        # how many seconds to take from the chronic recordings
+
+    def load_preframe(self, premade_frame_file):
+        # IF we're loading in a preframe, we're probably doing a bigger analysis
+        self.preFrame_file = premade_frame_file
+        print("Loading in PreFrame..." + self.preFrame_file)
+        self.Import_Frame(self.preFrame_file)
+
+        return self
 
     def generate_TD_sequence(self):
         self.build_phase_dict()
@@ -134,20 +132,12 @@ class BR_Data_Tree:
         self.build_phase_dict()
 
         # Here we go through all of our files in the dictionaries and put them into our database
-        self.list_files()
-        self.meta_files()
-
-        # Load in our data (timeseries)
-        self.Load_Data(domain=domain)
-        # now go in and remove anything with a bad flag
-        self.Remove_BadFlags()
-
-        # Go in and compute recording fidelity measures for all recordings
-        self.Check_GC()
+        self.list_files().meta_files().Load_Data(
+            domain=domain
+        ).Remove_BadFlags().Check_GC()
 
         # take out the phases that don't exist, and any other stuff, but so far that's all this does
-        self.prune_meta()
-        self.check_empty_phases()
+        self.prune_meta().check_empty_phases()
 
         # in case the meta-data isn't properly updated from the loaded in deta
         print("Data Loaded")
@@ -181,6 +171,8 @@ class BR_Data_Tree:
 
             rr.update({"GC_Flag": {"Flag": isgc, "Raw": gc_results, "Stim": isstim}})
 
+        return self
+
     def plot_GC_distribution(self):
         gc_plot = [None] * len(self.file_meta)
 
@@ -210,6 +202,8 @@ class BR_Data_Tree:
         except:
             raise ValueError("Error in the bad flag parsing...")
 
+        return self
+
     """This method parses the root data structure and populates a list of recordings"""
 
     def list_files(self):
@@ -227,6 +221,7 @@ class BR_Data_Tree:
                 if not (islogf or isrealtf or iseepromf):
                     file_list.append(filename)
         self.file_list = file_list
+        return self
 
     # Extract is referring to taking information from the raw BR files
     def extract_date(self, fname):
@@ -273,7 +268,7 @@ class BR_Data_Tree:
     def extract_pt(self, fname, split_string=None):
         if split_string is None:
             split_string = "lfp"
-            logging.warning(f"Using Default Split String of '{split_string}'")
+            logging.info(f"Using Default Split String of '{split_string}'")
         return fname.split(split_string)[1][1:4]
 
     def build_phase_dict(self):
@@ -294,6 +289,7 @@ class BR_Data_Tree:
                 )
 
         self.pd_dict = phdate_dict
+        return self
 
     def get_date_phase(self, pt, datet):
         # Given a patient and a date, return the PHASE of the study
@@ -319,6 +315,8 @@ class BR_Data_Tree:
 
         if len(empty_phases):
             print("Some Empty Phases!")
+
+        return self
 
     def meta_files(self, mode="Chronic"):
         # Here we're loading in the files that are in the MODE that we want
@@ -356,16 +354,25 @@ class BR_Data_Tree:
         file_meta = [x for x in file_meta if x is not None]
 
         self.file_meta = file_meta
+        return self
 
     def check_meta(self, prob_condit=0):
         """
         Checks all PSDs in the Frame to see if there are any fully-zero channels
         """
-        for rr in self.file_meta:
-            for ch in ["Left", "Right"]:
-                if rr["Data"][ch].all() == 0:
-                    print("PROBLEM: " + str(rr) + " has a zero PSD in channel " + ch)
+        key_error_count = 0
+        for idx, rr in enumerate(self.file_meta):
+            try:
+                for ch in ["Left", "Right"]:
+                    if rr["Data"][ch].all() == 0:
+                        print(
+                            "PROBLEM: " + str(rr) + " has a zero PSD in channel " + ch
+                        )
+            except KeyError as e:
+                key_error_count += 1
+                print(f"KeyError {e} at file_meta index {idx}: {rr}")
 
+        print(f"Total KeyErrors: {key_error_count}")
         logging.info("Meta Checks Complete")
 
     def prune_meta(self):
@@ -374,6 +381,7 @@ class BR_Data_Tree:
         new_meta = [rr for rr in self.file_meta if rr["Phase"] != None]
 
         self.file_meta = new_meta
+        return self
 
     def Import_Frame(self, preBuilt):
         print("Loading data from..." + self.im_root_dir)
@@ -402,6 +410,8 @@ class BR_Data_Tree:
                 rr.update({"Data": precheck_data})
             else:
                 rr.update({"BadFlag": True})
+
+        return self
 
     """Saves the frame to the intermediate directory"""
 
@@ -538,3 +548,8 @@ if __name__ == "__main__":
     DataFrame = BR_Data_Tree(premade_frame_file="GENERATE")
     DataFrame.generate_TD_sequence()
     DataFrame.Save_Frame(name_addendum="Dec2020_T")
+
+
+class BR_Data_Analysis:
+    def __init__(self, frame: BR_Data_Tree):
+        self.frame = frame
