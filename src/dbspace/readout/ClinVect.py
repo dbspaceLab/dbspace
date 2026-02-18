@@ -245,9 +245,8 @@ class CStruct:
             (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(bool))
         )
         # find the phase corresponding to the stim change
-        bump_phases = np.array(
-            [np.array(Phase_List("all"))[0:][idxs] for idxs in diff_matrix]
-        )
+        all_phases = np.array(Phase_List("all"))
+        bump_phases = [all_phases[idxs] for idxs in diff_matrix]
 
         full_table = [
             [(self.pt_list[rr], ph) for ph in row] for rr, row in enumerate(bump_phases)
@@ -695,12 +694,11 @@ class CFrame:
         # see: https://docs.google.com/spreadsheets/d/1HLZfMoE83ulHm0dc3j8c3ZEDk4LaF-0qQztnavgmAQw/edit#gid=0
 
         diff_matrix = np.hstack(
-            (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(np.bool))
+            (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(bool))
         )
         # find the phase corresponding to the stim change
-        bump_phases = np.array(
-            [np.array(Phase_List("all"))[0:][idxs] for idxs in diff_matrix]
-        )
+        all_phases = np.array(Phase_List("all"))
+        bump_phases = [all_phases[idxs] for idxs in diff_matrix]
 
         full_table = [
             [(self.do_pts[rr], ph) for ph in row] for rr, row in enumerate(bump_phases)

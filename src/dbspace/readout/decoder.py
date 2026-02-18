@@ -1018,7 +1018,7 @@ class controller_analysis:
         return precision, recall
 
     def pr_oracle(self, binarized, level=0.5):
-        oracle = np.array(np.copy(binarized)).astype(np.float)
+        oracle = np.array(np.copy(binarized)).astype(float)
         oracle += np.random.normal(0, level, size=oracle.shape)
 
         precision, recall, thresholds = precision_recall_curve(binarized, oracle)
@@ -1150,7 +1150,9 @@ class controller_analysis:
         plt.hist(aucs)
         plt.vlines(np.mean(aucs), -1, 10, linewidth=10)
         plt.xlim((0.0, 1.0))
-        plt.title(kwargs["title"])
+        
+        if "title" in kwargs:
+            plt.title(kwargs["title"])
 
         fig, ax = plt.subplots()
         mean_fpr = np.linspace(0, 1, 100)
