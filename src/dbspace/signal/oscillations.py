@@ -142,9 +142,10 @@ def featDict_to_Matr(featDict):
     return ret_matr
 
 
-def get_pow(Pxx, F, frange, cmode=np.median):
+def get_pow(Pxx, F, frange, cmode=np.median, log_input=False):
     # Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
     # Pxx is assumed to NOT be log transformed, so "positive semi-def"
+    # If log_input=True, Pxx is already in dB space (10*log10), so skip positivity check and final log
 
     # check if Pxx is NOT a dict
     if isinstance(Pxx, np.ndarray):
@@ -170,26 +171,26 @@ def get_pow(Pxx, F, frange, cmode=np.median):
 
     # for chans,psd in Pxx.items():
     for cc, chann in enumerate(chann_order):
-        # let's make sure the Pxx we're dealing with is as expected and a true PSD
-        if not (Pxx[chann] > 0).all():
-            logging.warning(
-                f"Non-positive values found in Pxx for channel {chann}. Check input PSD. Skipping..."
-            )
-            continue
+        if log_input:
+            # Already in dB space — take median directly
+            out_feats[chann] = cmode(Pxx[chann][Fidxs])
+        else:
+            # let's make sure the Pxx we're dealing with is as expected and a true PSD
+            if not (Pxx[chann] > 0).all():
+                logging.warning(
+                    f"Non-positive values found in Pxx for channel {chann}. Check input PSD. Skipping..."
+                )
+                continue
 
-        # if we want the sum
-        # out_feats[chans] = np.sum(psd[Fidxs])
-        # if we want the MEDIAN instead
-
-        # log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
-        out_feats[chann] = 10 * np.log10(cmode(Pxx[chann][Fidxs]))
+            # log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
+            out_feats[chann] = 10 * np.log10(cmode(Pxx[chann][Fidxs]))
 
     # return is going to be a dictionary with same elements
 
-    return out_feats  # This returns the out_feats which are 10*log(Pxx)
+    return out_feats  # This returns the out_feats which are 10*log(Pxx) (or dB residual if log_input)
 
 
-def get_slope(Pxx, F, params):
+def get_slope(Pxx, F, params, **kwargs):
     # method to get the fitted polynomial for the range desired
     frange = params["frange"]
     linorder = params["linorder"]
@@ -213,7 +214,7 @@ def get_slope(Pxx, F, params):
     return out_feats
 
 
-def get_ratio(Pxx, F, f_r_set, cmode=np.median):
+def get_ratio(Pxx, F, f_r_set, cmode=np.median, **kwargs):
     bandpow = [None] * len(f_r_set)
     # first get the power for each of the individual bands
     for bb, frange in enumerate(f_r_set):

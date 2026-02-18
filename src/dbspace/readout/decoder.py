@@ -341,17 +341,26 @@ class base_decoder:
         # pt_ph_vector = []
 
         for rr in data_set:
-            psd_poly_done = {
-                ch: poly_subtr(
-                    fvect=self.fvect, input_psd=rr["Data"][ch], polyord=5
-                )[0]
-                for ch in rr["Data"].keys()
-            }
+            if getattr(self, "log_transform", False):
+                # Work entirely in log (dB) space: log-transform, poly subtract, stay in log space
+                psd_poly_done = {}
+                for ch in rr["Data"].keys():
+                    log_psd = 10 * np.log10(np.maximum(rr["Data"][ch], 1e-10))
+                    pfit = np.polyfit(self.fvect, log_psd, 5)
+                    psd_poly_done[ch] = log_psd - np.poly1d(pfit)(self.fvect)
+            else:
+                psd_poly_done = {
+                    ch: poly_subtr(
+                        fvect=self.fvect, input_psd=rr["Data"][ch], polyord=5
+                    )[0]
+                    for ch in rr["Data"].keys()
+                }
 
             feat_vect = np.zeros(shape=(len(self.do_feats), self.ch_num))
+            _log_input = getattr(self, "log_transform", False)
             for ff, featname in enumerate(self.do_feats):
                 dofunc = dbo.FEAT_DICT[featname]
-                feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"])
+                feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"], log_input=_log_input)
                 feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
 
             # We need to flatten the state between channels...
@@ -494,6 +503,7 @@ class weekly_decoder(base_decoder):
             self.regression_algo = LassoCV()
 
         self.standardize = kwargs.get("standardize", False)
+        self.log_transform = kwargs.get("log_transform", False)
 
         if kwargs["variance"] == "both":
             self.variance_analysis = "both"
