@@ -23,6 +23,7 @@ from sklearn.metrics import (
     roc_curve,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
 
 np.random.seed(seed=2011)
@@ -36,7 +37,7 @@ default_params = {"CrossValid": 10}
 
 import seaborn as sns
 
-sns.set_context("paper", font_scale=4)
+sns.set_context("paper")
 sns.set_style("white")
 
 import copy
@@ -492,6 +493,8 @@ class weekly_decoder(base_decoder):
         elif kwargs["algo"] == "Lasso":
             self.regression_algo = LassoCV()
 
+        self.standardize = kwargs.get("standardize", False)
+
         if kwargs["variance"] == "both":
             self.variance_analysis = "both"
             mean_labels = ["L" + f for f in self.do_feats] + ["R" + f for f in self.do_feats]
@@ -550,6 +553,10 @@ class weekly_decoder(base_decoder):
             self.train_set_ph,
         ) = self.aggregate_weeks(self.train_set)
 
+        if self.standardize:
+            self.scaler_ = StandardScaler()
+            self.train_set_y = self.scaler_.fit_transform(self.train_set_y)
+
     def test_setup(self):
         print("Performing TESTING Setup for Weekly Decoder")
 
@@ -559,6 +566,10 @@ class weekly_decoder(base_decoder):
             self.test_set_pt,
             self.test_set_ph,
         ) = self.aggregate_weeks(self.test_set)
+
+        if self.standardize:
+            self.test_set_y = self.scaler_.transform(self.test_set_y)
+
         if self.do_shuffle_null:
             self.shuffle_test_c()
 
@@ -677,6 +688,10 @@ class weekly_decoderCV(weekly_decoder):
             self.train_set_pt,
             self.train_set_ph,
         ) = self.aggregate_weeks(self.train_set)
+
+        if self.standardize:
+            self.scaler_ = StandardScaler()
+            self.train_set_y = self.scaler_.fit_transform(self.train_set_y)
 
         self.model_args["alpha"] = self._path_slope_regression(do_plot=True)
         print("Set ENR-Alpha at " + str(self.model_args["alpha"]))
