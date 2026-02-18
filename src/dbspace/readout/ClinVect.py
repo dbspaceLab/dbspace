@@ -27,7 +27,7 @@ class CStruct:
     all_scales = ["HDRS17", "MADRS", "BDI", "GAF"]
     scale_max = {"HDRS17": 40, "MADRS": 50, "BDI": 60, "GAF": -100, "DSC": 0.01}
 
-    def __init__(self, clinical_metadata_file : Union[str,Path] = None, incl_scales=["HDRS17"]):
+    def __init__(self, clinical_metadata_file : Union[str,Path] = None, incl_scales=["HDRS17"], stim_change_file : Union[str,Path] = None):
         self.phase_list = Phase_List("all")
         if clinical_metadata_file is None:
             raise ValueError("Did not provide clinical metadata file to initialize CStruct")
@@ -45,7 +45,10 @@ class CStruct:
         self.depr_dict = depression_dict  # This is patient->phase->scale dictionary
 
         self.normalize_scales()
-        self.load_stim_changes()
+        if stim_change_file is not None:
+            self.load_stim_changes(stim_change_file)
+        else:
+            warnings.warn("No Stim Changes Metadata file (mat) provided.")
 
     """Wraps self.depr_dict to output a patient->scale->phase ARRAY"""
 
@@ -239,7 +242,7 @@ class CStruct:
         # return stim changes in a meaningful format
 
         diff_matrix = np.hstack(
-            (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(np.bool))
+            (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(bool))
         )
         # find the phase corresponding to the stim change
         bump_phases = np.array(
