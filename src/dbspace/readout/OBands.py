@@ -6,9 +6,10 @@ import dbspace as dbo
 from dbspace.utils.structures import nestdict
 from dbspace.utils.functions import unity
 from dbspace.readout.ClinVect import Phase_List
-from dbspace.signal.oscillations import FEAT_DICT, poly_subtr
+from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER, FEAT_DICT, poly_subtr
 import scipy.stats as stats
 import numpy as np
+import pandas as pd
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -567,6 +568,54 @@ class OBands:
             weeks_osc_distr[ch] = weekdistr
 
         return feats, outstats, weeks_osc_distr
+
+    def plot_power_distributions(self, do_feats=None, figsize=(20, 8)):
+        """Plot histogram of oscillatory power for each feature, colored by patient."""
+        if do_feats is None:
+            do_feats = DEFAULT_FEAT_ORDER
+        feat_labels = ["L" + f for f in do_feats] + ["R" + f for f in do_feats]
+        fvect = self.BRFrame.data_basis["F"]
+
+        all_y = []
+        all_pt = []
+        for rr in self.BRFrame.file_meta:
+            psd_poly_done = {
+                ch: poly_subtr(fvect=fvect, input_psd=rr["Data"][ch], polyord=5)[0]
+                for ch in rr["Data"].keys()
+            }
+            feat_vect = np.zeros(shape=(len(do_feats), 2))
+            for ff, featname in enumerate(do_feats):
+                dofunc = FEAT_DICT[featname]
+                feat_calc = dofunc["fn"](psd_poly_done, fvect, dofunc["param"])
+                feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
+            all_y.append(np.reshape(feat_vect, -1, order="F"))
+            all_pt.append(rr["Patient"])
+
+        df = pd.DataFrame(np.array(all_y), columns=feat_labels)
+        df["Patient"] = all_pt
+
+        pts = self.do_pts if self.do_pts is not None else sorted(df["Patient"].unique())
+        n_feats = len(feat_labels)
+        ncols = 5
+        nrows = (n_feats + ncols - 1) // ncols
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharey=False)
+        axes = np.atleast_2d(axes)
+
+        for ii, feat in enumerate(feat_labels):
+            ax = axes[ii // ncols, ii % ncols]
+            for pt in pts:
+                pt_data = df[df["Patient"] == pt][feat]
+                ax.hist(pt_data, bins=20, alpha=0.4, label=pt)
+            ax.set_title(feat)
+            ax.set_xlabel("Power")
+
+        for ii in range(n_feats, nrows * ncols):
+            axes[ii // ncols, ii % ncols].set_visible(False)
+
+        axes[0, -1].legend(fontsize=6)
+        plt.suptitle("Distribution of Oscillatory Power Across All Observations")
+        plt.tight_layout()
+        return fig
 
     def scatter_state(
         self,
