@@ -175,6 +175,8 @@ class proc_dEEG:
         self.median_responses = self.median_bootstrap_response(
             pt="POOL", bootstrap=100
         )["mean"]
+        # TODO
+        self.pop_meds()
 
     """Load in the MAT data for preprocessed EEG recordings"""
 
@@ -462,14 +464,6 @@ class proc_dEEG:
 
         return {"mean": mean_of_means, "var": var_of_means}
 
-    def OBSmedian_response(self, pt="POOL", mfunc=np.median):
-        print("Computing Median Response for " + pt)
-        print("Doing " + str(mfunc))
-        return {
-            condit: mfunc(self.osc_bl_norm[pt][condit], axis=0)
-            for condit in self.condits
-        }
-
     # Do per-channel, standard stats. Compare pre-stim to stim condition
     def per_chann_stats(self, condit="OnT", band="Alpha"):
         band_idx = dbo.feat_order.index(band)
@@ -534,15 +528,17 @@ class proc_dEEG:
 
     # TODO Remove all use_maya
     def topo_median_response(
-        self, pt="POOL", band="Alpha", do_condits=[], use_maya=False, seg_lim=None
+        self, pt="POOL", band="Alpha", do_condits=[], render_3d=False, seg_lim=None
     ):
-        band_i = dbo.feat_order.index(band)
+        band_index = dbo.feat_order.index(band)
 
         segments_dict = self.osc_bl_norm[pt]
         segments_tidx_dict = self.osc_bl_norm_timeidx[pt]
 
         if seg_lim is None:
             seg_lim = slice(None)
+            seg_upper = 999999
+            seg_lower = 0
         else:
             seg_lower = seg_lim[0]
             seg_upper = seg_lim[1]
@@ -565,11 +561,11 @@ class proc_dEEG:
                     self.osc_bl_norm[pt][condit][seg_lim, :, :], axis=0
                 ).squeeze()
             # The old scatterplot approach
-            if use_maya:
-                eeg3d.maya_band_display(response_dict[:, band_i])
+            if render_3d:
+                eeg3d.maya_band_display(response_dict[:, band_index])
             else:
                 EEG_Viz.plot_3d_scalp(
-                    response_dict[:, band_i],
+                    response_dict[:, band_index],
                     plt.figure(),
                     label=condit + " Mean Response " + band + " | " + pt,
                     unwrap=True,
@@ -580,7 +576,7 @@ class proc_dEEG:
                 )
                 plt.suptitle(pt)
 
-    def OnT_ctrl_dyn(self, pt="POOL", condit="OnT", do_plot=False):
+    def OnT_ctrl_dyn(self, pt="POOL", condit="OnT", do_plot=False, **kwargs):
         source_label = "Dyn PCA"
 
         response_stack = self.osc_bl_norm["POOL"][condit][:, :, 2]
@@ -623,7 +619,7 @@ class proc_dEEG:
         self.dyn_pca = svm_pca
         self.dyn_L = L
 
-    def OnT_ctrl_modes_segs_ICA(self, pt="POOL", do_plot=False):
+    def OnT_ctrl_modes_segs_ICA(self, pt="POOL", do_plot=False, **kwargs):
         seg_responses = self.osc_bl_norm[pt]["OnT"][:, :, 0:4]
         source_label = "Segment Responses"
 
@@ -895,9 +891,11 @@ class proc_dEEG:
             plt.legend(["PC0", "PC1", "PC2", "PC3", "PC4"])
             plt.title("Sparse Components")
 
-        if kwargs["plot_maya"]:
+        if kwargs["render_3d"]:
             response_dict = np.median(L, axis=0)[:, comp].squeeze()
-            EEG_Viz.maya_band_display(response_dict)
+            raise NotImplementedError(
+                "This is not set up for the tensor decomposition yet"
+            )
 
     # Dimensionality reduction of ONTarget response; for now rPCA
     def topo_OnT_ctrl_tensor(self, **kwargs):
@@ -929,7 +927,7 @@ class proc_dEEG:
         # print(core.shape)
         # print((factors))
 
-    def OnT_ctrl_modes(self, pt="POOL", data_source=[], do_plot=False, plot_maya=True):
+    def OnT_ctrl_modes(self, pt="POOL", data_source=[], do_plot=False, render_3d=True):
         print("Using BL Norm Segments - RAW")
         med_response = np.median(self.osc_bl_norm[pt]["OnT"], axis=0).squeeze()
         source_label = "BL Normed Segments"
@@ -1034,7 +1032,7 @@ class proc_dEEG:
             plt.legend(["PC0", "PC1", "PC2", "PC3", "PC4"])
             plt.title("Sparse Components")
 
-        if kwargs["plot_maya"]:
+        if kwargs["render_3d"]:
             # response_dict = np.median(L,axis=0)#[:,comp].squeeze()
             response = L[:, 1].squeeze()
             eeg3d.maya_band_display(response)
@@ -1111,184 +1109,11 @@ class proc_dEEG:
         plt.xlim([-100, 100])
         plt.ylim([-100, 100])
 
-    def OBStrain_simple(self):
-        # Train our simple classifier that just finds the shortest distance
-        self.signature = {"OnT": 0, "OffT": 0}
-        self.signature["OnT"] = self.pop_osc_change["OnT"][
-            dbo.feat_order.index("Alpha")
-        ] / np.linalg.norm(self.pop_osc_change["OnT"][dbo.feat_order.index("Alpha")])
-        self.signature["OffT"] = self.pop_osc_change["OffT"][
-            dbo.feat_order.index("Alpha")
-        ] / np.linalg.norm(self.pop_osc_change["OffT"][dbo.feat_order.index("Alpha")])
-
-    def OBStest_simple(self):
-        # go to our GMM stack and, for each segment, determine the distance to the two conditions
-
-        # Set up our signature
-        cort_sig = {"OnT": self.Seg_Med[0]["OnT"], "OffT": self.Seg_Med[0]["OffT"]}
-
-        # Now let's generate a stacked set of the SAME
-
-        for condit in self.condits:
-            seg_stack = self.GMM_Osc_stack[condit]
-            seg_num = seg_stack.shape[1]
-            OnT_sim[condit] = [None] * seg_num
-            OffT_sim[condit] = [None] * seg_num
-
-            for seg in range(seg_num):
-                net_vect = seg_stack[:, seg, dbo.feat_order.index("Alpha")].reshape(
-                    -1, 1
-                )
-                net_vect = net_vect / np.linalg.norm(net_vect)
-
-                OnT_sim[condit][seg] = np.arccos(
-                    np.dot(net_vect.T, self.signature["OnT"].reshape(-1, 1))
-                    / np.linalg.norm(net_vect)
-                )
-                OffT_sim[condit][seg] = np.arccos(
-                    np.dot(net_vect.T, self.signature["OffT"].reshape(-1, 1))
-                    / np.linalg.norm(net_vect)
-                )
-
-            OnT_sim[condit] = np.array(OnT_sim[condit])
-            OffT_sim[condit] = np.array(OffT_sim[condit])
-
-        return (OnT_sim, OffT_sim)
-
-    def OBSinterval_stats(self, do_band="Alpha"):
-        big_stack = self.osc_dict
-        band_idx = dbo.feat_order.index(do_band)
-        plag = nestdict()
-
-        for pt in self.do_pts:
-            for condit in self.condits:
-                plag[pt][condit] = big_stack[pt][condit][keys_oi[condit][1]][
-                    :, :, band_idx
-                ] - np.median(big_stack[pt][condit]["Off_3"][:, :, band_idx], axis=0)
-
-            sig_chann_list = []
-
-            plt.figure()
-            bins = np.linspace(-10, 10, 20)
-            for ch in range(257):
-                # Unfortunately, wilxocon won't work since we're not matched :(
-                # wrst = stats.wilcoxon(plag[pt]['OnT'][:,ch],plag[pt]['OffT'][:,ch])
-                # mwut = stats.mannwhitneyu(plag[pt]['OnT'][:,ch],plag[pt]['OffT'][:,ch]) #to compare OnT with OffT
-                mwut = stats.wilcoxon(plag[pt]["OnT"][:, ch])
-                # kstest = stats.kstest(plag[pt]['OnT'][:,ch],'norm')
-
-                usestat = mwut
-                if usestat[1] < 0.05 / 256:
-                    sig_chann_list.append(ch)
-                    print(str(ch) + " " + str(usestat))
-                    plt.hist(plag[pt]["OnT"][:, ch], bins, alpha=1)
-
-            # now we want 3d plot of significant channels!
-            sig_chann_list = np.array(sig_chann_list)
-            sig_stat_mask = np.zeros((257,))
-            sig_stat_mask[sig_chann_list] = 1
-
-            fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(sig_stat_mask, fig, animate=False, unwrap=True)
-
-    # in this method, we're going to do per-channel statistics for each patient, channel, band
-
     def band_stats(self, do_band="Alpha"):
         self.pop_meds()
 
     def plot_band_stats(self, do_band="Alpha"):
         self.plot_meds(band=do_band, flatten=not self.pretty)
-
-    def OBSsimple_stats(self):
-        # We have a bit stack of the segments oscillatory powers
-
-        ref_stack = self.big_stack_dict
-        # Work with the Osc Dict data
-        for condit in self.condits:
-            ref_stack[condit]["Diff"] = (
-                defaultdict()
-            )  # {key:[] for key in ([self.do_pts] + ['All'])}
-            for epoch in ["OF", "ON"]:
-                for pt in self.do_pts:
-                    ref_stack[condit][epoch][pt + "med"] = np.median(
-                        ref_stack[condit][epoch][pt], axis=0
-                    )
-                    ref_stack[condit][epoch][pt + "mad"] = robust.mad(
-                        ref_stack[condit][epoch][pt], axis=0
-                    )
-                # stack all
-                all_stack = [ref_stack[condit][epoch][pt] for pt in self.do_pts]
-
-                ref_stack[condit][epoch]["MED"] = np.median(
-                    np.concatenate(all_stack, axis=0), axis=0
-                )
-                ref_stack[condit][epoch]["MAD"] = robust.mad(
-                    np.concatenate(all_stack, axis=0), axis=0
-                )
-
-            for pt in self.do_pts:
-                ref_stack[condit]["Diff"][pt] = (
-                    ref_stack[condit]["ON"][pt + "med"]
-                    - ref_stack[condit]["OF"][pt + "med"]
-                )
-            ref_stack[condit]["Diff"]["All"] = (
-                ref_stack[condit]["ON"]["MED"] - ref_stack[condit]["OF"]["MED"]
-            )
-
-        all_stack = np.concatenate(
-            [
-                np.concatenate(
-                    [
-                        np.concatenate(
-                            [ref_stack[condit][epoch][pt] for pt in self.do_pts], axis=0
-                        )
-                        for epoch in ["OF", "ON"]
-                    ],
-                    axis=0,
-                )
-                for condit in self.condits
-            ],
-            axis=0,
-        )
-        label_stack = [
-            [
-                [
-                    [condit + epoch for seg in ref_stack[condit][epoch][pt]]
-                    for pt in self.do_pts
-                ]
-                for epoch in ["OF", "ON"]
-            ]
-            for condit in self.condits
-        ]
-        label_list = [item for sublist in label_stack for item in sublist]
-        label_list = [item for sublist in label_list for item in sublist]
-        label_list = [item for sublist in label_list for item in sublist]
-
-        # go through each and if the last two characters are 'OF' -> 'OF' is label
-        newlab = {"OffTOF": "OFF", "OnTOF": "OFF", "OnTON": "OnTON", "OffTON": "OffTON"}
-        label_list = [newlab[item] for item in label_list]
-
-        self.SVM_stack = all_stack
-        self.SVM_labels = np.array(label_list)
-
-    def find_seg_covar(self):
-        covar_matrix = nestdict()
-
-        for condit in self.condits:
-            seg_stack = sig.detrend(self.GMM_Osc_stack[condit], axis=1, type="constant")
-            seg_num = seg_stack.shape[1]
-
-            for bb, band in enumerate(dbo.feat_order):
-                covar_matrix[condit][band] = []
-                for seg in range(seg_num):
-                    net_vect = seg_stack[:, seg, bb].reshape(-1, 1)
-
-                    cov_matr = np.dot(net_vect, net_vect.T)
-                    covar_matrix[condit][band].append(cov_matr)
-
-                covar_matrix[condit][band] = np.array(covar_matrix[condit][band])
-
-        self.cov_segs = covar_matrix
 
     def plot_seg_covar(self, band="Alpha"):
         for condit in self.condits:
@@ -1367,118 +1192,6 @@ class proc_dEEG:
             )
             plt.title("Plotting component " + str(cc))
             plt.suptitle(approach + " rotated results for " + pca_condit)
-
-    def DEPRpca_decomp(
-        self,
-        direction="channels",
-        band="Alpha",
-        condit="OnT",
-        bl_correct=False,
-        pca_type="pca",
-        plot_distr=False,
-    ):
-        print("Doing PCA on the SVM Oscillatory Stack")
-        # check to see if we have what variables we need
-        Xdsgn = self.SVM_stack
-        lbls = self.SVM_labels
-
-        lblsdo = lbls == condit + "ON"
-
-        Xdo = Xdsgn[lblsdo, :, :]
-
-        # what do we want to do with this now?
-        # spatiotemporal PCA
-        Xdo = np.median(Xdo, axis=0)
-
-        # BL_correct here is NOT patient specific bl correction
-        if bl_correct:
-            print("Correcting with baseline (OFF EEG)")
-            # find the stim Off timepoints to subtract
-            X_bl = np.median(Xdsgn[lbls == "OFF", :, :], axis=0)
-
-            Xdo = Xdo - X_bl
-
-        PCAdsgn = sig.detrend(Xdo, axis=0, type="constant")
-        PCAdsgn = sig.detrend(PCAdsgn, axis=1, type="constant")
-
-        bins = np.linspace(-3, 3, 50)
-
-        # If we want to do PCA here
-        if pca_type == "pca":
-            pca = PCA()
-            pca.fit(PCAdsgn)
-
-            if plot_distr:
-                plt.figure()
-                for bb in range(5):
-                    plt.hist(PCAdsgn[:, bb], bins=bins, alpha=0.2)
-                plt.suptitle("PCA inputs")
-
-            self.PCA_d = pca
-            self.PCA_inX = Xdo
-
-            PCA_X = pca.fit_transform(PCAdsgn)
-            self.PCA_x = PCA_X
-        elif pca_type == "rpca":
-            # if we want to do rPCA here
-            rpca = R_pca(PCAdsgn)
-            L, S = rpca.fit()
-
-            if plot_distr:
-                plt.figure()
-                for bb in range(5):
-                    plt.hist(L[:, bb], bins=bins, alpha=0.2)
-                plt.suptitle("rPCA outputs")
-            ##We treated rpca as a filtering step, so now we work solely with the low-rank component using the same procedure as above in the 'pca' block
-            # definitely a more elegant way of merging these steps, good luck next grad student
-
-            # Srcomp, Srevals, Srevecs = simple_pca(S)
-            # Lrcomp, Lrevals, Lrevecs = simple_pca(L)
-            pca = PCA()
-            pca.fit(L)
-            #
-            #            print('Using fit-transformed L')
-            # Below shouldn't actually DO anything, since L is already from the output of rPCA and should already be aligned along its principal axes
-            # But need pca() wrapper to get the coefficients, since I don't think r_pca includes it
-            PCA_L = pca.fit_transform(L)
-
-            self.PCA_d = pca
-            self.PCA_inX = Xdo
-
-            self.PCA_x = PCA_L
-
-    def DEPRgen_GMM_priors(self, condit="OnT", mask_chann=False, band="Alpha"):
-        # prior_change = self.pop_osc_mask[condit][dbo.feat_order.index(band)] * self.pop_osc_change[condit][dbo.feat_order.index(band)].reshape(-1,1)
-        prior_change = self.pop_osc_change[condit][dbo.feat_order.index(band)].reshape(
-            -1, 1
-        )
-        if mask_chann:
-            mask = self.median_mask
-            prior_covar = np.dot(prior_change[mask], prior_change[mask].T)
-        else:
-            prior_covar = np.dot(prior_change, prior_change.T)
-
-        self.prior_covar = prior_covar
-        return prior_covar
-
-    def DEPRgen_GMM_Osc(self, GMM_stack):
-        fvect = self.fvect
-
-        feat_out = nestdict()
-
-        for condit in self.condits:
-            num_segs = GMM_stack[condit].shape[1]
-            feat_out[condit] = np.zeros((257, num_segs, len(dbo.feat_order)))
-
-            for ss in range(num_segs):
-                feat_out[condit][:, ss, :] = dbo.calc_feats(
-                    10 ** (GMM_stack[condit][:, ss, :] / 10).squeeze(), fvect
-                )[0].T
-
-        # THIS CURRENTLY HAS nans
-        GMM_Osc_stack = feat_out
-
-        return {"Stack": GMM_Osc_stack}
 
     def shape_GMM_dsgn(self, inStack_dict, band="Alpha", mask_channs=False):
         segs_feats = nestdict()
@@ -2052,74 +1765,6 @@ class proc_dEEG:
 
         print(np.sum(np.array(Yte) == np.array(predlabels)) / len(Yte))
 
-    def OBStrain_SVM(self, mask=False):
-        num_segs = self.SVM_stack.shape[0]
-
-        # generate a mask
-        if mask:
-            # what mask do we want?
-            # self.SVM_Mask = self.median_mask
-            self.SVM_Mask = np.zeros((257,)).astype(bool)
-            self.SVM_Mask[[238, 237]] = True
-
-            sub_X = self.SVM_stack[:, self.SVM_Mask, :]
-            dsgn_X = sub_X.reshape(num_segs, -1, order="C")
-        else:
-            dsgn_X = self.SVM_stack.reshape(num_segs, -1, order="C")
-
-        # Learning curve
-        print("Learning Curve")
-        tsize, tscore, vscore = learning_curve(
-            svm.LinearSVC(penalty="l2", dual=False),
-            dsgn_X,
-            self.SVM_labels,
-            train_sizes=np.linspace(0.2, 1.0, 5),
-            cv=5,
-        )
-        plt.figure()
-        plt.plot(tsize, np.mean(tscore, axis=1))
-        plt.plot(tsize, np.mean(vscore, axis=1))
-
-        # doing a one class SVM
-        # clf = svm.OneClassSVM(nu=0.1,kernel="rbf", gamma=0.1)
-        clf = svm.LinearSVC(penalty="l2", dual=False)
-
-        # split out into test and train
-        Xtr, Xte, Ytr, Yte = sklearn.model_selection.train_test_split(
-            dsgn_X, self.SVM_labels, test_size=0.33
-        )
-
-        clf.fit(Xtr, Ytr)
-
-        # predict IN training set
-        predlabels = clf.predict(Xte)
-
-        plt.figure()
-        plt.subplot(2, 1, 1)
-        plt.plot(Yte, label="test")
-        plt.plot(predlabels, label="predict")
-        simple_accuracy = np.sum(np.array(Yte) == np.array(predlabels)) / len(Yte)
-        plt.title(
-            "SVM Results with Mask:"
-            + str(mask)
-            + " ; Accuracy: "
-            + str(simple_accuracy)
-        )
-        plt.legend()
-
-        pickle.dump(clf, open("/tmp/SVMModel_l2", "wb"))
-
-        plt.subplot(2, 1, 2)
-        conf_matrix = confusion_matrix(predlabels, Yte)
-        plt.imshow(conf_matrix)
-        plt.yticks(np.arange(0, 3), ["OFF", "OffT", "OnT"])
-        plt.xticks(np.arange(0, 3), ["OFF", "OffT", "OnT"])
-        plt.colorbar()
-
-        self.SVM = clf
-        self.SVM_dsgn_X = dsgn_X
-        self.SVM_test_labels = predlabels
-
     def assess_dynamics(self, band="Alpha"):
         band_idx = dbo.feat_order.index(band)
         self.OnT_v_OffT_MAD()
@@ -2254,34 +1899,6 @@ class proc_dEEG:
     Need to phase this out completely
     Except it gives results in $\gamma$ that make more sense superficially
     """
-
-    def OBS_SVM_dsgn(self, do_plot=False):
-        label_map = self.label_map
-
-        # PREEMPT WITH OLD WAY HERE
-        dsgn_X = self.shape_GMM_dsgn(
-            self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl="normalize")["Stack"]),
-            band="All",
-        )
-        ALLT_dsgn_X = np.concatenate([dsgn_X[c] for c in ["OnT", "OffT"]], axis=0)
-
-        flat_dsgn_Y = np.concatenate(
-            [[c for a in dsgn_X[c]] for c in ["OnT", "OffT"]], axis=0
-        )  # attempt to handle labels
-        num_segs = ALLT_dsgn_X.shape[0]
-        flat_dsgn_X = ALLT_dsgn_X.reshape(num_segs, -1, order="C")
-        # dsgn_Y = np.concatenate([[label_map[condit] for seg in self.osc_bl_norm['POOL'][condit]] for condit in self.condits],axis=0)
-        flat_dsgn_X[flat_dsgn_X > 1e300] = 0
-        # ipdb.set_trace()
-        if do_plot:
-            # collapse along all segments and channels
-            plot_stack = flat_dsgn_X.swapaxes(0, 2).reshape(5, -1, order="C")
-            plt.figure()
-            sns.violinplot(data=plot_stack, positions=np.arange(5))
-
-        return flat_dsgn_X, flat_dsgn_Y, num_segs
-
-    """ This function retrieves a design matrix from the pooled observations """
 
     def stack_dsgn(self, do_plot=False):
         label_map = self.label_map
