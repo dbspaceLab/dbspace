@@ -19,7 +19,6 @@ import scipy.signal as sig
 
 import scipy.stats as stats
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 from sklearn.utils import resample
 
@@ -1743,7 +1742,7 @@ class proc_dEEG:
     def band_mads(self):
         pass
 
-    def band_distr(self, do_moment="meds"):
+    def plot_band_distr(self, do_moment="meds"):
         print("Plotting Distribution for Bands")
 
         meds = nestdict()
