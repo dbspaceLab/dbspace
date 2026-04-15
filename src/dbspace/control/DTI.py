@@ -220,7 +220,7 @@ class engaged_tractography:
 
         return diff_map
 
-    def plot_preference_mask(self, condits=["OnT", "OffT"], threshold=0.05):
+    def plot_preference_mask(self, condits=["OnT", "OffT"], threshold=0.05, export_file = False):
         """
         The preference mask is a comparison of the engaged tractography for two conditions.
         This method plots the engaged tractography for each condition and the difference between them.
@@ -231,7 +231,7 @@ class engaged_tractography:
         if type(condits) is not list or len(condits) != 2:
             raise ValueError("Preference Mask needs two conditions to compare...")
 
-        diff_map = self.calculate_preference_mask(condits=condits, threshold=threshold)
+        diff_map = self.calculate_preference_mask(condits=condits, threshold=threshold, export_file=export_file)
         for target in condits:
             plotting.plot_glass_brain(
                 diff_map[target],
