@@ -1502,7 +1502,7 @@ class proc_dEEG:
             print(rsres)
 
         # plt.suptitle(condit)
-        plt.ylim((-0.2, 10))
+        plt.ylim((-20,20))
         plt.hlines(0, -1, 4, linestyle="dotted")
         plt.legend(["OnTarget", "OffTarget"])
 
