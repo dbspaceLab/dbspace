@@ -31,15 +31,30 @@ class engaged_tractography:
     def __init__(
         self,
         target_electrode_map,
-        do_pts=["901", "903", "905", "906", "907", "908"],
-        v_list=range(2, 8),
-        do_condits=["OnT", "OffT"],
+        do_pts=None,
+        volt_range=None,
+        do_condits=None,
         base_data_dir=None,
+        do_sides=None,
     ):
+        if do_pts is None:
+            raise ValueError("Must Provide Patient Labels to Analyse.")
+
+        if volt_range is None:
+            raise ValueError("Must Provide Voltage Range to Analyse.")
+
+        if do_condits is None:
+            raise ValueError(
+                "Must Provide at least one stimulation condition/target to analyse."
+            )
+
+        if do_sides is None:
+            do_sides = ["L", "R"]
+
         self.do_pts = do_pts
-        self.v_list = list(v_list)
+        self.v_list = list(volt_range)
         self.do_condits = do_condits
-        self.stim_configurations = ["L", "R"]
+        self.stim_configurations = do_sides
         self.base_data_dir = base_data_dir
 
         self.load_electrode_map(target_electrode_map)
@@ -93,6 +108,17 @@ class engaged_tractography:
 
         self.dti_data = data_arr
 
+    def plot_dti_voltage(self, pt="906", condit="OnT"):
+        dti_levels = self.dti_data[pt][condit]
+
+        plotting.plot_glass_brain(
+            dti_levels,
+            black_bg=True,
+            title=condit + " Tractography",
+            vmin=0,
+            vmax=10,
+        )
+
     def load_electrode_map(self, target_map_config):
         with open(target_map_config, "r") as electrode_map:
             self.electrode_map = json.load(electrode_map)
@@ -109,12 +135,14 @@ class engaged_tractography:
     This method plots the DTI for a given patient x condition combination
     """
 
-    def plot_engaged_tractography(self, condits=["OnT", "OffT"], export_files=False):
+    def plot_engaged_tractography(
+        self, condits=["OnT", "OffT"], export_files=False, mean_op: str = "mean"
+    ):
         if type(condits) is not list:
             raise ValueError("condits should be a list of conditions to plot...")
         for cc, condit in enumerate(condits):
             engaged_tracto = self.calc_engaged_tractography(
-                condit=condit, export_file=export_files
+                condit=condit, export_file=export_files, mean_op=mean_op
             )
 
             plotting.plot_glass_brain(
@@ -125,14 +153,20 @@ class engaged_tractography:
                 vmax=15,
             )
 
-    def calc_engaged_tractography(self, condit, export_file=False):
+    def calc_engaged_tractography(
+        self, condit, export_file=False, mean_op: str = "mean"
+    ):
+        """
+        This function calculates "engaged tractography" by mean-ing across patients in a given condition.
+        Builds from self.dti_data, which takes the binary mask at every voltage and sums them.
+        """
         dti_data = self.dti_data
 
         avg_image = [dti_data[pt][condit] for pt in self.do_pts]
 
         keys = [f"img{n}" for n, pt in enumerate(self.do_pts)]
         # sum_string = "+".join(keys)
-        mean_string = "np.mean(np.array([" + ",".join(keys) + "]),axis=0)"
+        mean_string = "np." + mean_op + "(np.array([" + ",".join(keys) + "]),axis=0)"
         sum_args = {f"img{n}": dti_data[pt][condit] for n, pt in enumerate(self.do_pts)}
 
         return_image = image.math_img(mean_string, **sum_args)
@@ -179,6 +213,43 @@ class engaged_tractography:
                 diff_map[target],
                 black_bg=True,
                 title=target + " Engaged Preference Diff",
+                vmin=-10,
+                vmax=10,
+            )
+
+    def calculate_preference_level(
+        self,
+        condits=["OnT", "OffT"],
+        threshold=0.05,
+        export_file: Union[bool, str] = False,
+    ):
+        diff_map = self.calculate_preference_diff(condits=condits, export_file=False)
+        pref_level = nestdict()
+        for target in condits:
+            pref_level[target] = image.math_img(
+                "img1 * (img1 > " + str(threshold) + ")",
+                img1=diff_map[target],
+            )
+            if export_file is True:
+                if type(export_file) is str:
+                    write_filepath = export_file
+                else:
+                    write_filepath = WRITE_DIR + "pref_tractography_"
+                pref_level[target].to_filename(
+                    write_filepath + target + "_pref_level.nii.gz"
+                )
+
+        return pref_level
+
+    def plot_preference_level(self, condits=["OnT", "OffT"], threshold=0.05):
+        pref_level = self.calculate_preference_level(
+            condits=condits, threshold=threshold, export_file=False
+        )
+        for target in condits:
+            plotting.plot_glass_brain(
+                pref_level[target],
+                black_bg=True,
+                title=target + " Engaged Preference Level",
                 vmin=-10,
                 vmax=10,
             )
