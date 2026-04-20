@@ -41,6 +41,7 @@ import sklearn
 from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.model_selection import learning_curve, StratifiedKFold
 import pickle
+import os
 
 from dbspace.tools.r_pca import R_pca
 from typing import Tuple
@@ -528,7 +529,13 @@ class proc_dEEG:
 
     # TODO Remove all use_maya
     def topo_median_response(
-        self, pt="POOL", band="Alpha", do_condits=[], render_3d=False, seg_lim=None
+        self,
+        pt="POOL",
+        band="Alpha",
+        do_condits=[],
+        render_3d=False,
+        seg_lim=None,
+        write_output: Optional[str] = None,
     ):
         band_index = dbo.feat_order.index(band)
 
@@ -560,6 +567,24 @@ class proc_dEEG:
                 response_dict = np.median(
                     self.osc_bl_norm[pt][condit][seg_lim, :, :], axis=0
                 ).squeeze()
+            # write to file
+            if write_output is not None:
+                # check if the directory exists
+                output_dir = os.path.dirname(write_output)
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+
+                np.save(
+                    write_output
+                    + "cortical_response__"
+                    + pt
+                    + "_"
+                    + condit
+                    + "_"
+                    + band
+                    + ".npy",
+                    response_dict[:, band_index],
+                )
             # The old scatterplot approach
             if render_3d:
                 eeg3d.maya_band_display(response_dict[:, band_index])
